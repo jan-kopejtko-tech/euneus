@@ -73,6 +73,16 @@
         let retryButton;
         let isPlayerDead = false;
 
+        const SERVER_URL = "wss://your-railway-url.up.railway.app"; // USE YOUR RAILWAY URL
+
+let client = new Colyseus.Client(SERVER_URL);
+let room;
+
+async function connectToMultiplayer() {
+    room = await client.joinOrCreate("battle");
+    console.log("Connected!");
+}
+
         function preload() {}
 
         function create() {
