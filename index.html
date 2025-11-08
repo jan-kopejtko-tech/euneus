@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knight Swarm - Emoji Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+        #game-container {
+            box-shadow: 0 0 40px rgba(200, 150, 50, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <script>
+        const config = {
+            type: Phaser.CANVAS, // Using CANVAS for better emoji rendering
+            width: 1200,
+            height: 800,
+            parent: 'game-container',
+            backgroundColor: '#2d5016',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        // WORLD SIZE - Much larger like agar.io
+        const WORLD_WIDTH = 4000;
+        const WORLD_HEIGHT = 3000;
+
+        let player;
+        let allies;
+        let mobs;
+        let pointer;
+        
+        // ENEMY PLAYER
+        let enemyPlayer;
+        let enemyAllies;
+        
+        let kills = 0;
+        let nextAllyAt = 3;
+        
+        let killText;
+        let armyText;
+        
+        // Death screen elements
+        let deathOverlay;
+        let deathText;
+        let retryButton;
+        let isPlayerDead = false;
+
+        function preload() {}
+
+        function create() {
+            // Set world bounds to large size
+            this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+            
+            // Setup camera
+            this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+            this.cameras.main.setZoom(0.7); // Start slightly zoomed out
+            
+            // Create emoji textures using canvas rendering
+            createEmojiTexture(this, 'player', '🛡️', 64);
+            createEmojiTexture(this, 'knight', '⚔️', 56);
+            createEmojiTexture(this, 'archer', '🏹', 52);
+            createEmojiTexture(this, 'mob', '👹', 48);
+            
+            // Attack effects
+            const swordGfx = this.add.graphics();
+            swordGfx.fillStyle(0xffff00, 1);
+            swordGfx.fillRect(0, 0, 4, 12);
+            swordGfx.fillStyle(0xffaa00, 1);
+            swordGfx.fillTriangle(2, 0, 0, 3, 4, 3);
+            swordGfx.generateTexture('sword', 4, 12);
+            swordGfx.destroy();
+            
+            const arrowGfx = this.add.graphics();
+            arrowGfx.fillStyle(0x885533, 1);
+            arrowGfx.fillRect(0, 0, 2, 10);
+            arrowGfx.fillStyle(0xcccccc, 1);
+            arrowGfx.fillTriangle(1, 0, 0, 3, 2, 3);
+            arrowGfx.generateTexture('arrow', 2, 10);
+            arrowGfx.destroy();
+            
+            const bloodGfx = this.add.graphics();
+            bloodGfx.fillStyle(0xff0000, 1);
+            bloodGfx.fillCircle(3, 3, 3);
+            bloodGfx.generateTexture('blood', 6, 6);
+            bloodGfx.destroy();
+            
+            // Create player
+            player = this.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 'player');
+            player.setData('hp', 100);
+            player.setData('maxHp', 100);
+            player.setData('damage', 20); // Hero does more damage
+            player.setData('attackRange', 80);
+            player.setData('attackSpeed', 500);
+            player.setData('lastAttack', 0);
+            player.setData('isPlayer', true);
+            player.setData('team', 'blue'); // Player team
+            
+            // Camera follows player
+            this.cameras.main.startFollow(player, true, 0.1, 0.1);
+            
+            // Add glow effect to player
+            const glow = this.add.circle(player.x, player.y, 35, 0x3366ff, 0.2);
+            glow.setBlendMode(Phaser.BlendModes.ADD);
+            this.tweens.add({
+                targets: glow,
+                alpha: { from: 0.2, to: 0.4 },
+                scale: { from: 1, to: 1.2 },
+                duration: 1000,
+                yoyo: true,
+                repeat: -1
+            });
+            
+            // Update glow position
+            this.events.on('update', () => {
+                if (player && player.active) {
+                    glow.setPosition(player.x, player.y);
+                }
+            });
+            
+            // Create groups
+            allies = this.physics.add.group();
+            enemyAllies = this.physics.add.group(); // Enemy army
+            mobs = this.physics.add.group();
+            
+            // CREATE ENEMY PLAYER (in bottom-right corner)
+            enemyPlayer = this.physics.add.sprite(WORLD_WIDTH - 500, WORLD_HEIGHT - 500, 'player');
+            enemyPlayer.setTint(0xff4444); // Red tint for enemy
+            enemyPlayer.setData('hp', 100);
+            enemyPlayer.setData('maxHp', 100);
+            enemyPlayer.setData('damage', 20);
+            enemyPlayer.setData('attackRange', 80);
+            enemyPlayer.setData('attackSpeed', 500);
+            enemyPlayer.setData('lastAttack', 0);
+            enemyPlayer.setData('isPlayer', true);
+            enemyPlayer.setData('team', 'red');
+            enemyPlayer.setData('facingAngle', Math.PI); // Face left initially
+            
+            // Spawn 50 knights for enemy
+            for (let i = 0; i < 50; i++) {
+                spawnEnemyAlly(this, 'knight', i);
+            }
+            
+            // Spawn 50 archers for enemy
+            for (let i = 0; i < 50; i++) {
+                spawnEnemyAlly(this, 'archer', i + 50);
+            }
+            
+            // Spawn initial mobs across the larger world
+            for (let i = 0; i < 80; i++) {
+                spawnMob(this);
+            }
+            
+            // Input
+            pointer = this.input.activePointer;
+            
+            // UI - Fixed to camera
+            killText = this.add.text(20, 20, 'Kills: 0', {
+                fontSize: '32px',
+                color: '#ffffff',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 5
+            }).setScrollFactor(0); // Fixed to camera
+            
+            armyText = this.add.text(20, 60, 'Army: 1', {
+                fontSize: '28px',
+                color: '#ffaa00',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setScrollFactor(0); // Fixed to camera
+            
+            // Legend with actual emojis
+            this.add.text(600, 15, '🛡️ You  •  ⚔️ Knights  •  🏹 Archers  •  👹 Goblins', {
+                fontSize: '24px',
+                color: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5, 0).setScrollFactor(0); // Fixed to camera
+            
+            this.add.text(600, 755, 'MOVE: Mouse  •  Auto-attack nearby enemies', {
+                fontSize: '18px',
+                color: '#aaaaaa',
+                stroke: '#000000',
+                strokeThickness: 2
+            }).setOrigin(0.5).setScrollFactor(0); // Fixed to camera
+            
+            // RESTART BUTTON (top-right corner)
+            const restartBg = this.add.rectangle(1150, 30, 90, 40, 0x444444)
+                .setScrollFactor(0)
+                .setDepth(500)
+                .setInteractive({ useHandCursor: true });
+            
+            const restartText = this.add.text(1150, 30, '↻ Restart', {
+                fontSize: '18px',
+                color: '#ffffff',
+                fontStyle: 'bold'
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(501);
+            
+            // Restart button interactions
+            restartBg.on('pointerover', () => {
+                restartBg.setFillStyle(0x666666);
+            });
+            restartBg.on('pointerout', () => {
+                restartBg.setFillStyle(0x444444);
+            });
+            restartBg.on('pointerdown', () => {
+                location.reload();
+            });
+            
+            // DEATH SCREEN (hidden initially)
+            deathOverlay = this.add.rectangle(600, 400, 1200, 800, 0x000000, 0.8)
+                .setScrollFactor(0)
+                .setDepth(1000)
+                .setVisible(false);
+            
+            deathText = this.add.text(600, 300, 'YOU DIED', {
+                fontSize: '72px',
+                color: '#ff0000',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 8
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1001).setVisible(false);
+            
+            const retryBg = this.add.rectangle(600, 420, 200, 60, 0x444444)
+                .setScrollFactor(0)
+                .setDepth(1001)
+                .setVisible(false)
+                .setInteractive({ useHandCursor: true });
+            
+            retryButton = this.add.text(600, 420, 'RETRY', {
+                fontSize: '32px',
+                color: '#ffffff',
+                fontStyle: 'bold'
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1002).setVisible(false);
+            
+            // Retry button hover effects
+            retryBg.on('pointerover', () => {
+                retryBg.setFillStyle(0x666666);
+            });
+            retryBg.on('pointerout', () => {
+                retryBg.setFillStyle(0x444444);
+            });
+            retryBg.on('pointerdown', () => {
+                location.reload(); // Reload the page to restart
+            });
+            
+            // Store references for showing death screen
+            this.deathOverlay = deathOverlay;
+            this.deathText = deathText;
+            this.retryButton = retryButton;
+            this.retryBg = retryBg;
+            
+            // Spawn mobs over time
+            this.time.addEvent({
+                delay: 3000,
+                callback: () => {
+                    for (let i = 0; i < 5; i++) {
+                        spawnMob(this);
+                    }
+                },
+                loop: true
+            });
+        }
+
+        // Helper function to create emoji textures
+        function createEmojiTexture(scene, key, emoji, size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw emoji
+            ctx.font = `${size * 0.8}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(emoji, size / 2, size / 2);
+            
+            // Add to Phaser as texture
+            scene.textures.addCanvas(key, canvas);
+        }
+
+        function update(time, delta) {
+            // Stop updating if player is dead
+            if (isPlayerDead) return;
+            
+            if (player && player.active) {
+                const distance = Phaser.Math.Distance.Between(
+                    player.x, player.y,
+                    pointer.worldX, pointer.worldY
+                );
+                
+                const speed = 220;
+                
+                if (distance > 20) {
+                    const angle = Phaser.Math.Angle.Between(
+                        player.x, player.y,
+                        pointer.worldX, pointer.worldY
+                    );
+                    
+                    // Rotate player to face movement direction
+                    player.rotation = angle + Math.PI / 2; // +90 degrees so shield faces forward
+                    
+                    player.setVelocity(
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed
+                    );
+                    
+                    // Store facing angle for formation
+                    player.setData('facingAngle', angle);
+                } else {
+                    player.setVelocity(0, 0);
+                }
+                
+                // Keep in world bounds
+                player.x = Phaser.Math.Clamp(player.x, 30, WORLD_WIDTH - 30);
+                player.y = Phaser.Math.Clamp(player.y, 30, WORLD_HEIGHT - 30);
+                
+                autoAttack(game.scene.scenes[0], player, time);
+            }
+            
+            // DYNAMIC CAMERA ZOOM based on army size (like agar.io)
+            const armySize = allies.children.entries.length + 1; // +1 for player
+            const targetZoom = Math.max(0.4, 0.7 - (armySize * 0.01)); // Start at 0.7, zoom out as army grows
+            const currentZoom = game.scene.scenes[0].cameras.main.zoom;
+            const newZoom = currentZoom + (targetZoom - currentZoom) * 0.05; // Smooth zoom
+            game.scene.scenes[0].cameras.main.setZoom(newZoom);
+            
+            // ENEMY PLAYER AI - Simple movement toward player
+            if (enemyPlayer && enemyPlayer.active && player && player.active) {
+                const distToPlayer = Phaser.Math.Distance.Between(
+                    enemyPlayer.x, enemyPlayer.y,
+                    player.x, player.y
+                );
+                
+                // Move toward player if far, stop if close
+                if (distToPlayer > 400) {
+                    const angle = Phaser.Math.Angle.Between(
+                        enemyPlayer.x, enemyPlayer.y,
+                        player.x, player.y
+                    );
+                    
+                    enemyPlayer.rotation = angle + Math.PI / 2;
+                    enemyPlayer.setVelocity(
+                        Math.cos(angle) * 180,
+                        Math.sin(angle) * 180
+                    );
+                    enemyPlayer.setData('facingAngle', angle);
+                } else {
+                    enemyPlayer.setVelocity(0, 0);
+                }
+                
+                enemyPlayer.x = Phaser.Math.Clamp(enemyPlayer.x, 30, WORLD_WIDTH - 30);
+                enemyPlayer.y = Phaser.Math.Clamp(enemyPlayer.y, 30, WORLD_HEIGHT - 30);
+                
+                autoAttack(game.scene.scenes[0], enemyPlayer, time);
+            }
+            
+            // ENEMY ARMY FORMATION
+            updateEnemyFormation(time);
+            
+            // RENDER HEALTH BARS for all units with HP
+            renderHealthBars(game.scene.scenes[0]);
+            
+            // Formation-based ally positioning with CENTER-OUT filling
+            const knights = [];
+            const archers = [];
+            
+            allies.children.entries.forEach(ally => {
+                if (!ally || !ally.active) return;
+                if (ally.getData('isArcher')) {
+                    archers.push(ally);
+                } else {
+                    knights.push(ally);
+                }
+            });
+            
+            // Get player's facing direction
+            const playerAngle = player.getData('facingAngle') || 0;
+            
+            // Helper function: Get formation position filling from center
+            function getCenterOutPosition(index, maxPerRow) {
+                const row = Math.floor(index / maxPerRow);
+                const posInRow = index % maxPerRow;
+                
+                // Fill from center outward
+                // Pattern: 0 -> center, 1 -> left of center, 2 -> right of center, 3 -> left, 4 -> right...
+                let colOffset;
+                if (posInRow === 0 && maxPerRow === 1) {
+                    colOffset = 0; // Single unit, dead center
+                } else {
+                    // Alternate left-right from center
+                    const side = posInRow % 2 === 0 ? 1 : -1; // Even = right, odd = left
+                    const distance = Math.ceil(posInRow / 2);
+                    colOffset = side * distance;
+                }
+                
+                return { row, col: colOffset };
+            }
+            
+            // Position KNIGHTS in rows in FRONT of player (center-out)
+            knights.forEach((knight, index) => {
+                const pos = getCenterOutPosition(index, 10);
+                
+                const horizontalSpacing = 45;
+                const forwardSpacing = 50;
+                
+                // Create perpendicular and parallel vectors to facing direction
+                const forwardX = Math.cos(playerAngle);
+                const forwardY = Math.sin(playerAngle);
+                const rightX = -Math.sin(playerAngle);
+                const rightY = Math.cos(playerAngle);
+                
+                // Position: forward + sideways offset
+                const targetX = player.x + (forwardX * forwardSpacing * (pos.row + 1)) + (rightX * horizontalSpacing * pos.col);
+                const targetY = player.y + (forwardY * forwardSpacing * (pos.row + 1)) + (rightY * horizontalSpacing * pos.col);
+                
+                // Move toward formation position
+                const distance = Phaser.Math.Distance.Between(
+                    knight.x, knight.y,
+                    targetX, targetY
+                );
+                
+                if (distance > 15) {
+                    const angle = Phaser.Math.Angle.Between(
+                        knight.x, knight.y,
+                        targetX, targetY
+                    );
+                    
+                    const speed = 220;
+                    knight.setVelocity(
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed
+                    );
+                    
+                    // Rotate knight to face same direction as player
+                    knight.rotation = playerAngle + Math.PI / 2;
+                } else {
+                    knight.setVelocity(
+                        knight.body.velocity.x * 0.88,
+                        knight.body.velocity.y * 0.88
+                    );
+                }
+                
+                knight.x = Phaser.Math.Clamp(knight.x, 30, WORLD_WIDTH - 30);
+                knight.y = Phaser.Math.Clamp(knight.y, 30, WORLD_HEIGHT - 30);
+                
+                autoAttack(game.scene.scenes[0], knight, time);
+            });
+            
+            // Position ARCHERS BEHIND player (center-out)
+            archers.forEach((archer, index) => {
+                const pos = getCenterOutPosition(index, 10);
+                
+                const horizontalSpacing = 45;
+                const backwardSpacing = 50;
+                
+                // Create perpendicular and parallel vectors
+                const backwardX = -Math.cos(playerAngle); // Opposite of forward
+                const backwardY = -Math.sin(playerAngle);
+                const rightX = -Math.sin(playerAngle);
+                const rightY = Math.cos(playerAngle);
+                
+                // Position: backward + sideways offset
+                const targetX = player.x + (backwardX * backwardSpacing * (pos.row + 1)) + (rightX * horizontalSpacing * pos.col);
+                const targetY = player.y + (backwardY * backwardSpacing * (pos.row + 1)) + (rightY * horizontalSpacing * pos.col);
+                
+                const distance = Phaser.Math.Distance.Between(
+                    archer.x, archer.y,
+                    targetX, targetY
+                );
+                
+                if (distance > 15) {
+                    const angle = Phaser.Math.Angle.Between(
+                        archer.x, archer.y,
+                        targetX, targetY
+                    );
+                    
+                    const speed = 210;
+                    archer.setVelocity(
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed
+                    );
+                    
+                    // Rotate archer to face formation direction
+                    archer.rotation = playerAngle + Math.PI / 2;
+                } else {
+                    archer.setVelocity(
+                        archer.body.velocity.x * 0.88,
+                        archer.body.velocity.y * 0.88
+                    );
+                }
+                
+                archer.x = Phaser.Math.Clamp(archer.x, 30, WORLD_WIDTH - 30);
+                archer.y = Phaser.Math.Clamp(archer.y, 30, WORLD_HEIGHT - 30);
+                
+                autoAttack(game.scene.scenes[0], archer, time);
+            });
+            
+            mobs.children.entries.forEach(mob => {
+                if (!mob || !mob.active) return;
+                
+                if (!mob.getData('targetX')) {
+                    setRandomTarget(mob);
+                }
+                
+                const distance = Phaser.Math.Distance.Between(
+                    mob.x, mob.y,
+                    mob.getData('targetX'),
+                    mob.getData('targetY')
+                );
+                
+                if (distance < 20 || time - mob.getData('lastMove') > 3000) {
+                    setRandomTarget(mob);
+                    mob.setData('lastMove', time);
+                }
+                
+                const angle = Phaser.Math.Angle.Between(
+                    mob.x, mob.y,
+                    mob.getData('targetX'),
+                    mob.getData('targetY')
+                );
+                
+                const speed = 55;
+                mob.setVelocity(
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed
+                );
+                
+                mob.x = Phaser.Math.Clamp(mob.x, 30, WORLD_WIDTH - 30);
+                mob.y = Phaser.Math.Clamp(mob.y, 30, WORLD_HEIGHT - 30);
+            });
+        }
+
+        function showDeathScreen(scene) {
+            isPlayerDead = true;
+            
+            // Show death screen elements
+            scene.deathOverlay.setVisible(true);
+            scene.deathText.setVisible(true);
+            scene.retryButton.setVisible(true);
+            scene.retryBg.setVisible(true);
+            
+            // Add final stats
+            const statsText = scene.add.text(600, 360, `Kills: ${kills}  •  Army Size: ${allies.children.entries.length + 1}`, {
+                fontSize: '24px',
+                color: '#ffaa00',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+        }
+
+        function renderHealthBars(scene) {
+            // Clear old health bars
+            if (scene.healthBarGraphics) {
+                scene.healthBarGraphics.clear();
+            } else {
+                scene.healthBarGraphics = scene.add.graphics();
+                scene.healthBarGraphics.setDepth(999);
+            }
+            
+            const graphics = scene.healthBarGraphics;
+            
+            // Helper to draw health bar
+            function drawHealthBar(unit, yOffset = -35) {
+                if (!unit || !unit.active) return;
+                
+                const hp = unit.getData('hp');
+                const maxHp = unit.getData('maxHp');
+                if (!hp || !maxHp) return;
+                
+                const barWidth = 40;
+                const barHeight = 5;
+                const x = unit.x - barWidth / 2;
+                const y = unit.y + yOffset;
+                
+                // Background (red)
+                graphics.fillStyle(0x000000, 0.5);
+                graphics.fillRect(x - 1, y - 1, barWidth + 2, barHeight + 2);
+                graphics.fillStyle(0xff0000, 1);
+                graphics.fillRect(x, y, barWidth, barHeight);
+                
+                // Health (green)
+                const healthPercent = Math.max(0, hp / maxHp);
+                const team = unit.getData('team');
+                const healthColor = team === 'red' ? 0xff6666 : 0x00ff00;
+                graphics.fillStyle(healthColor, 1);
+                graphics.fillRect(x, y, barWidth * healthPercent, barHeight);
+            }
+            
+            // Draw health bar for player
+            if (player && player.active) {
+                drawHealthBar(player, -40);
+            }
+            
+            // Draw health bars for player allies
+            allies.children.entries.forEach(ally => {
+                drawHealthBar(ally, -30);
+            });
+            
+            // Draw health bar for enemy player
+            if (enemyPlayer && enemyPlayer.active) {
+                drawHealthBar(enemyPlayer, -40);
+            }
+            
+            // Draw health bars for enemy allies
+            enemyAllies.children.entries.forEach(ally => {
+                drawHealthBar(ally, -30);
+            });
+        }
+
+        function updateEnemyFormation(time) {
+            if (!enemyPlayer || !enemyPlayer.active) return;
+            
+            const enemyKnights = [];
+            const enemyArchers = [];
+            
+            enemyAllies.children.entries.forEach(ally => {
+                if (!ally || !ally.active) return;
+                if (ally.getData('isArcher')) {
+                    enemyArchers.push(ally);
+                } else {
+                    enemyKnights.push(ally);
+                }
+            });
+            
+            const enemyAngle = enemyPlayer.getData('facingAngle') || 0;
+            
+            // Helper function from main formation
+            function getCenterOutPosition(index, maxPerRow) {
+                const row = Math.floor(index / maxPerRow);
+                const posInRow = index % maxPerRow;
+                let colOffset;
+                if (posInRow === 0 && maxPerRow === 1) {
+                    colOffset = 0;
+                } else {
+                    const side = posInRow % 2 === 0 ? 1 : -1;
+                    const distance = Math.ceil(posInRow / 2);
+                    colOffset = side * distance;
+                }
+                return { row, col: colOffset };
+            }
+            
+            // Position enemy knights ahead
+            enemyKnights.forEach((knight, index) => {
+                const pos = getCenterOutPosition(index, 10);
+                const horizontalSpacing = 45;
+                const forwardSpacing = 50;
+                
+                const forwardX = Math.cos(enemyAngle);
+                const forwardY = Math.sin(enemyAngle);
+                const rightX = -Math.sin(enemyAngle);
+                const rightY = Math.cos(enemyAngle);
+                
+                const targetX = enemyPlayer.x + (forwardX * forwardSpacing * (pos.row + 1)) + (rightX * horizontalSpacing * pos.col);
+                const targetY = enemyPlayer.y + (forwardY * forwardSpacing * (pos.row + 1)) + (rightY * horizontalSpacing * pos.col);
+                
+                const distance = Phaser.Math.Distance.Between(knight.x, knight.y, targetX, targetY);
+                
+                if (distance > 15) {
+                    const angle = Phaser.Math.Angle.Between(knight.x, knight.y, targetX, targetY);
+                    knight.setVelocity(Math.cos(angle) * 220, Math.sin(angle) * 220);
+                    knight.rotation = enemyAngle + Math.PI / 2;
+                } else {
+                    knight.setVelocity(knight.body.velocity.x * 0.88, knight.body.velocity.y * 0.88);
+                }
+                
+                knight.x = Phaser.Math.Clamp(knight.x, 30, WORLD_WIDTH - 30);
+                knight.y = Phaser.Math.Clamp(knight.y, 30, WORLD_HEIGHT - 30);
+                
+                autoAttack(game.scene.scenes[0], knight, time);
+            });
+            
+            // Position enemy archers behind
+            enemyArchers.forEach((archer, index) => {
+                const pos = getCenterOutPosition(index, 10);
+                const horizontalSpacing = 45;
+                const backwardSpacing = 50;
+                
+                const backwardX = -Math.cos(enemyAngle);
+                const backwardY = -Math.sin(enemyAngle);
+                const rightX = -Math.sin(enemyAngle);
+                const rightY = Math.cos(enemyAngle);
+                
+                const targetX = enemyPlayer.x + (backwardX * backwardSpacing * (pos.row + 1)) + (rightX * horizontalSpacing * pos.col);
+                const targetY = enemyPlayer.y + (backwardY * backwardSpacing * (pos.row + 1)) + (rightY * horizontalSpacing * pos.col);
+                
+                const distance = Phaser.Math.Distance.Between(archer.x, archer.y, targetX, targetY);
+                
+                if (distance > 15) {
+                    const angle = Phaser.Math.Angle.Between(archer.x, archer.y, targetX, targetY);
+                    archer.setVelocity(Math.cos(angle) * 210, Math.sin(angle) * 210);
+                    archer.rotation = enemyAngle + Math.PI / 2;
+                } else {
+                    archer.setVelocity(archer.body.velocity.x * 0.88, archer.body.velocity.y * 0.88);
+                }
+                
+                archer.x = Phaser.Math.Clamp(archer.x, 30, WORLD_WIDTH - 30);
+                archer.y = Phaser.Math.Clamp(archer.y, 30, WORLD_HEIGHT - 30);
+                
+                autoAttack(game.scene.scenes[0], archer, time);
+            });
+        }
+
+        function spawnMob(scene) {
+            const x = Phaser.Math.Between(100, WORLD_WIDTH - 100);
+            const y = Phaser.Math.Between(100, WORLD_HEIGHT - 100);
+            
+            const mob = mobs.create(x, y, 'mob');
+            mob.setData('hp', 30);
+            mob.setData('maxHp', 30);
+            mob.setData('lastMove', 0);
+            
+            setRandomTarget(mob);
+        }
+
+        function setRandomTarget(mob) {
+            mob.setData('targetX', Phaser.Math.Between(100, WORLD_WIDTH - 100));
+            mob.setData('targetY', Phaser.Math.Between(100, WORLD_HEIGHT - 100));
+        }
+
+        function spawnEnemyAlly(scene, type, index) {
+            const isArcher = type === 'archer';
+            const texture = isArcher ? 'archer' : 'knight';
+            
+            const ally = enemyAllies.create(
+                enemyPlayer.x + Math.random() * 200 - 100,
+                enemyPlayer.y + Math.random() * 200 - 100,
+                texture
+            );
+            
+            ally.setTint(0xff8888); // Red tint for enemy units
+            ally.setData('team', 'red');
+            
+            if (isArcher) {
+                ally.setData('isArcher', true);
+                ally.setData('hp', 5);
+                ally.setData('maxHp', 5);
+                ally.setData('damage', 2.5);
+                ally.setData('attackRange', 160);
+                ally.setData('attackSpeed', 850);
+            } else {
+                ally.setData('hp', 10);
+                ally.setData('maxHp', 10);
+                ally.setData('damage', 5);
+                ally.setData('attackRange', 75);
+                ally.setData('attackSpeed', 550);
+            }
+            
+            ally.setData('lastAttack', 0);
+        }
+
+        function autoAttack(scene, attacker, time) {
+            if (!attacker || !attacker.active) return;
+            
+            const lastAttack = attacker.getData('lastAttack') || 0;
+            const attackSpeed = attacker.getData('attackSpeed') || 500;
+            
+            if (time - lastAttack < attackSpeed) return;
+            
+            const attackRange = attacker.getData('attackRange') || 80;
+            const damage = attacker.getData('damage') || 10;
+            const isArcher = attacker.getData('isArcher') || false;
+            const attackerTeam = attacker.getData('team');
+            
+            // Find nearest enemy (mobs OR enemy units)
+            let nearest = null;
+            let minDist = attackRange;
+            let targetType = null; // 'mob', 'unit', or 'player'
+            
+            // Check mobs
+            mobs.children.entries.forEach(mob => {
+                if (!mob || !mob.active) return;
+                
+                const dist = Phaser.Math.Distance.Between(
+                    attacker.x, attacker.y,
+                    mob.x, mob.y
+                );
+                
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = mob;
+                    targetType = 'mob';
+                }
+            });
+            
+            // Check enemy units (if attacker is on a team)
+            if (attackerTeam) {
+                const enemyGroup = attackerTeam === 'blue' ? enemyAllies : allies;
+                const enemyHero = attackerTeam === 'blue' ? enemyPlayer : player;
+                
+                // Check enemy units
+                enemyGroup.children.entries.forEach(enemy => {
+                    if (!enemy || !enemy.active) return;
+                    
+                    const dist = Phaser.Math.Distance.Between(
+                        attacker.x, attacker.y,
+                        enemy.x, enemy.y
+                    );
+                    
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = enemy;
+                        targetType = 'unit';
+                    }
+                });
+                
+                // Check enemy hero
+                if (enemyHero && enemyHero.active) {
+                    const dist = Phaser.Math.Distance.Between(
+                        attacker.x, attacker.y,
+                        enemyHero.x, enemyHero.y
+                    );
+                    
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = enemyHero;
+                        targetType = 'player';
+                    }
+                }
+            }
+            
+            if (nearest) {
+                attacker.setData('lastAttack', time);
+                
+                if (isArcher) {
+                    const arrow = scene.add.sprite(attacker.x, attacker.y, 'arrow');
+                    const angle = Phaser.Math.Angle.Between(
+                        attacker.x, attacker.y,
+                        nearest.x, nearest.y
+                    );
+                    arrow.setRotation(angle);
+                    arrow.setScale(2);
+                    
+                    scene.tweens.add({
+                        targets: arrow,
+                        x: nearest.x,
+                        y: nearest.y,
+                        duration: 120,
+                        onComplete: () => {
+                            arrow.destroy();
+                            if (nearest && nearest.active) {
+                                if (targetType === 'mob') {
+                                    damageMob(scene, nearest, damage);
+                                } else {
+                                    damageUnit(scene, nearest, damage, targetType);
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    const slash = scene.add.sprite(attacker.x, attacker.y, 'sword');
+                    slash.setAlpha(0.9);
+                    slash.setScale(2);
+                    const angle = Phaser.Math.Angle.Between(
+                        attacker.x, attacker.y,
+                        nearest.x, nearest.y
+                    );
+                    slash.setRotation(angle);
+                    
+                    scene.tweens.add({
+                        targets: slash,
+                        x: nearest.x,
+                        y: nearest.y,
+                        alpha: 0,
+                        rotation: angle + Math.PI * 0.5,
+                        duration: 120,
+                        onComplete: () => slash.destroy()
+                    });
+                    
+                    if (targetType === 'mob') {
+                        damageMob(scene, nearest, damage);
+                    } else {
+                        damageUnit(scene, nearest, damage, targetType);
+                    }
+                }
+            }
+        }
+
+        function damageUnit(scene, unit, damage, unitType) {
+            if (!unit || !unit.active) return;
+            
+            const hp = unit.getData('hp') - damage;
+            unit.setData('hp', hp);
+            
+            // Flash white
+            unit.setTint(0xffffff);
+            scene.time.delayedCall(80, () => {
+                if (unit && unit.active) {
+                    // Restore team color or clear tint
+                    const team = unit.getData('team');
+                    if (team === 'red') {
+                        unit.setTint(unitType === 'player' ? 0xff4444 : 0xff8888);
+                    } else {
+                        unit.clearTint();
+                    }
+                }
+            });
+            
+            // Blood splatter
+            for (let i = 0; i < 3; i++) {
+                const blood = scene.add.sprite(unit.x, unit.y, 'blood');
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 15 + 10;
+                
+                scene.tweens.add({
+                    targets: blood,
+                    x: unit.x + Math.cos(angle) * dist,
+                    y: unit.y + Math.sin(angle) * dist,
+                    alpha: 0,
+                    scale: { from: 1, to: 0.3 },
+                    duration: 350,
+                    onComplete: () => blood.destroy()
+                });
+            }
+            
+            if (hp <= 0) {
+                // Death particles
+                for (let i = 0; i < 5; i++) {
+                    const particle = scene.add.circle(
+                        unit.x, unit.y,
+                        2 + Math.random() * 2,
+                        0xff4444
+                    );
+                    const angle = (Math.PI * 2 * i) / 5;
+                    scene.tweens.add({
+                        targets: particle,
+                        x: unit.x + Math.cos(angle) * 30,
+                        y: unit.y + Math.sin(angle) * 30,
+                        alpha: 0,
+                        duration: 300,
+                        onComplete: () => particle.destroy()
+                    });
+                }
+                
+                // Check if it's the player
+                if (unitType === 'player' && unit === player) {
+                    showDeathScreen(scene);
+                    unit.setVisible(false);
+                    unit.body.enable = false;
+                } else {
+                    unit.destroy();
+                }
+                
+                // Update army count if it was player's unit
+                if (unit.getData('team') === 'blue' && unit !== player) {
+                    armyText.setText(`Army: ${allies.children.entries.length + 1}`);
+                }
+            }
+        }
+
+        function damageMob(scene, mob, damage) {
+            if (!mob || !mob.active) return;
+            
+            const hp = mob.getData('hp') - damage;
+            mob.setData('hp', hp);
+            
+            mob.setTint(0xffffff);
+            scene.time.delayedCall(80, () => {
+                if (mob && mob.active) mob.clearTint();
+            });
+            
+            // Blood splatter
+            for (let i = 0; i < 6; i++) {
+                const blood = scene.add.sprite(mob.x, mob.y, 'blood');
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 25 + 15;
+                
+                scene.tweens.add({
+                    targets: blood,
+                    x: mob.x + Math.cos(angle) * dist,
+                    y: mob.y + Math.sin(angle) * dist,
+                    alpha: 0,
+                    scale: { from: 1, to: 0.3 },
+                    duration: 450,
+                    onComplete: () => blood.destroy()
+                });
+            }
+            
+            if (hp <= 0) {
+                // Death explosion
+                for (let i = 0; i < 8; i++) {
+                    const particle = scene.add.circle(
+                        mob.x, mob.y, 
+                        3 + Math.random() * 3, 
+                        0xff4444
+                    );
+                    const angle = (Math.PI * 2 * i) / 8;
+                    scene.tweens.add({
+                        targets: particle,
+                        x: mob.x + Math.cos(angle) * 40,
+                        y: mob.y + Math.sin(angle) * 40,
+                        alpha: 0,
+                        duration: 400,
+                        onComplete: () => particle.destroy()
+                    });
+                }
+                
+                mob.destroy();
+                kills++;
+                killText.setText(`Kills: ${kills}`);
+                
+                if (kills >= nextAllyAt) {
+                    spawnAlly(scene);
+                    nextAllyAt += 3;
+                }
+                
+                scene.time.delayedCall(2500, () => {
+                    spawnMob(scene);
+                });
+            }
+        }
+
+        function spawnAlly(scene) {
+            if (!player || !player.active) return;
+            
+            const isArcher = Math.random() < 0.4;
+            const texture = isArcher ? 'archer' : 'knight';
+            
+            // Spawn near player but not on top
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 60 + Math.random() * 40;
+            
+            const ally = allies.create(
+                player.x + Math.cos(angle) * dist,
+                player.y + Math.sin(angle) * dist,
+                texture
+            );
+            
+            ally.setData('team', 'blue'); // Player team
+            
+            if (isArcher) {
+                ally.setData('isArcher', true);
+                ally.setData('hp', 5);
+                ally.setData('maxHp', 5);
+                ally.setData('damage', 2.5);
+                ally.setData('attackRange', 160);
+                ally.setData('attackSpeed', 850);
+            } else {
+                ally.setData('hp', 10);
+                ally.setData('maxHp', 10);
+                ally.setData('damage', 5);
+                ally.setData('attackRange', 75);
+                ally.setData('attackSpeed', 550);
+            }
+            
+            ally.setData('lastAttack', 0);
+            
+            // Spawn animation
+            ally.setScale(0);
+            ally.setAlpha(0);
+            scene.tweens.add({
+                targets: ally,
+                scale: 1,
+                alpha: 1,
+                duration: 400,
+                ease: 'Back.easeOut'
+            });
+            
+            // Spawn flash
+            const flash = scene.add.circle(ally.x, ally.y, 50, 0xffaa00, 0.6);
+            scene.tweens.add({
+                targets: flash,
+                alpha: 0,
+                scale: 2,
+                duration: 400,
+                onComplete: () => flash.destroy()
+            });
+            
+            armyText.setText(`Army: ${allies.children.entries.length + 1}`);
+        }
+    </script>
+</body>
+</html>
