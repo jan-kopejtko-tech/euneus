@@ -14,12 +14,13 @@ class BattleRoom extends Room {
     // World constants
     this.WORLD_WIDTH = 4000;
     this.WORLD_HEIGHT = 3000;
+    this.PLAYER_SPEED = 220; // Pixels per second
     
     // Spawn initial mobs
     this.spawnMobs(80);
     
-    // Game loop - 20 updates per second
-    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 50);
+    // Game loop - 60 updates per second (like agar.io)
+    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / 60);
     
     // Spawn more mobs periodically
     this.mobSpawnTimer = this.clock.setInterval(() => {
@@ -39,7 +40,12 @@ class BattleRoom extends Room {
       hp: 100,
       maxHp: 100,
       kills: 0,
-      army: [] // Will store {type: 'knight'/'archer', hp, maxHp, damage}
+      army: [],
+      // Input-based movement (like agar.io)
+      targetX: this.WORLD_WIDTH / 2,
+      targetY: this.WORLD_HEIGHT / 2,
+      velocityX: 0,
+      velocityY: 0
     };
     
     this.state.players[client.sessionId] = player;
@@ -57,8 +63,17 @@ class BattleRoom extends Room {
     if (!player) return;
     
     switch(type) {
+      case "input":
+        // ⭐ INPUT-BASED (like agar.io)
+        // Client sends where their mouse is pointing
+        // Server calculates movement
+        player.targetX = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.targetX));
+        player.targetY = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, message.targetY));
+        break;
+        
       case "move":
-        // Update player position and angle
+        // ❌ OLD POSITION-BASED (keeping for backwards compatibility)
+        // Will be removed once client is updated
         player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.x));
         player.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, message.y));
         player.angle = message.angle;
@@ -94,9 +109,44 @@ class BattleRoom extends Room {
     this.mobSpawnTimer.clear();
   }
   
-  // Game loop
+  // Game loop - 60Hz like agar.io
   update(deltaTime) {
     this.state.tick++;
+    
+    const deltaSeconds = deltaTime / 1000;
+    
+    // ⭐ UPDATE PLAYER POSITIONS BASED ON INPUT (server-authoritative)
+    for (let sessionId in this.state.players) {
+      const player = this.state.players[sessionId];
+      
+      // Calculate direction to target (mouse position)
+      const dx = player.targetX - player.x;
+      const dy = player.targetY - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Move toward target if far enough
+      if (distance > 20) {
+        // Calculate angle
+        player.angle = Math.atan2(dy, dx);
+        
+        // Calculate velocity
+        const speed = this.PLAYER_SPEED * deltaSeconds;
+        player.velocityX = (dx / distance) * speed;
+        player.velocityY = (dy / distance) * speed;
+        
+        // Update position
+        player.x += player.velocityX;
+        player.y += player.velocityY;
+        
+        // Keep in bounds
+        player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, player.x));
+        player.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, player.y));
+      } else {
+        // Stop if close to target
+        player.velocityX = 0;
+        player.velocityY = 0;
+      }
+    }
     
     // Update mobs AI (simple random movement)
     for (let mobId in this.state.mobs) {
@@ -114,7 +164,7 @@ class BattleRoom extends Room {
       const dist = Math.sqrt(dx * dx + dy * dy);
       
       if (dist > 5) {
-        const speed = 50 * (deltaTime / 1000);
+        const speed = 50 * deltaSeconds;
         mob.x += (dx / dist) * speed;
         mob.y += (dy / dist) * speed;
       }
