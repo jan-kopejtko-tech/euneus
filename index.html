@@ -87,7 +87,7 @@
         
         // Throttle position updates (conservative to avoid rate limits)
         let lastInputSent = 0;
-        const INPUT_SEND_INTERVAL = 150; // Send every 150ms (~7 times per second)
+        const INPUT_SEND_INTERVAL = 100; // Send every 100ms (~10 times per second)
         
         // Death screen elements
         let deathOverlay;
@@ -162,7 +162,7 @@ async function connectToMultiplayer() {
                     const sprite = otherPlayers[sessionId];
                     if (sprite && sprite.active) {
                         // ⭐ Interpolate position for smooth movement
-                        const lerpFactor = 0.3; // Adjust for smoothness
+                        const lerpFactor = 0.6; // Higher = more responsive, less smooth
                         const newX = Phaser.Math.Linear(sprite.x, serverPlayer.x, lerpFactor);
                         const newY = Phaser.Math.Linear(sprite.y, serverPlayer.y, lerpFactor);
                         
@@ -207,8 +207,8 @@ async function connectToMultiplayer() {
                             // Update existing ally with interpolation
                             const allySprite = allySprites[i];
                             if (allySprite && allySprite.active) {
-                                const newX = Phaser.Math.Linear(allySprite.x, x, 0.3);
-                                const newY = Phaser.Math.Linear(allySprite.y, y, 0.3);
+                                const newX = Phaser.Math.Linear(allySprite.x, x, 0.6);
+                                const newY = Phaser.Math.Linear(allySprite.y, y, 0.6);
                                 allySprite.setPosition(newX, newY);
                                 allySprite.setRotation(angle);
                             }
@@ -263,8 +263,8 @@ async function connectToMultiplayer() {
                     // Update existing mob
                     const mobSprite = serverMobs[mobId];
                     if (mobSprite && mobSprite.active) {
-                        const newX = Phaser.Math.Linear(mobSprite.x, serverMob.x, 0.2);
-                        const newY = Phaser.Math.Linear(mobSprite.y, serverMob.y, 0.2);
+                        const newX = Phaser.Math.Linear(mobSprite.x, serverMob.x, 0.5);
+                        const newY = Phaser.Math.Linear(mobSprite.y, serverMob.y, 0.5);
                         mobSprite.setPosition(newX, newY);
                         mobSprite.setData('hp', serverMob.hp);
                     }
@@ -723,23 +723,8 @@ function updateConnectionStatus(status, text) {
             game.scene.scenes[0].cameras.main.setZoom(newZoom);
             
             // Update other players (they will be moved by server state)
-            // Make other players attack
-            for (let sessionId in otherPlayers) {
-                const otherPlayer = otherPlayers[sessionId];
-                if (otherPlayer && otherPlayer.active) {
-                    autoAttack(game.scene.scenes[0], otherPlayer, time);
-                }
-            }
-            
-            // Update other players' allies - make them attack
-            for (let sessionId in otherPlayerAllies) {
-                const enemyAllies = otherPlayerAllies[sessionId];
-                enemyAllies.forEach(ally => {
-                    if (ally && ally.active) {
-                        autoAttack(game.scene.scenes[0], ally, time);
-                    }
-                });
-            }
+            // Note: Other players in inactive tabs won't attack (throttled RAF)
+            // Only the ACTIVE player's units attack - this is intentional
             
             // RENDER HEALTH BARS for all units with HP
             renderHealthBars(game.scene.scenes[0]);
@@ -1173,23 +1158,7 @@ function updateConnectionStatus(status, text) {
             let minDist = attackRange;
             let targetType = null; // 'mob', 'unit', or 'player'
             
-            // Check mobs
-            mobs.children.entries.forEach(mob => {
-                if (!mob || !mob.active) return;
-                
-                const dist = Phaser.Math.Distance.Between(
-                    attacker.x, attacker.y,
-                    mob.x, mob.y
-                );
-                
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearest = mob;
-                    targetType = 'mob';
-                }
-            });
-            
-            // Check enemy units (if attacker is on a team)
+            // Check enemy units FIRST (if attacker is on a team) - PvP priority
             if (attackerTeam === 'blue') {
                 // Player team attacks red team (other players)
                 
@@ -1229,6 +1198,22 @@ function updateConnectionStatus(status, text) {
                     });
                 }
             }
+            
+            // Check mobs (lower priority than PvP)
+            mobs.children.entries.forEach(mob => {
+                if (!mob || !mob.active) return;
+                
+                const dist = Phaser.Math.Distance.Between(
+                    attacker.x, attacker.y,
+                    mob.x, mob.y
+                );
+                
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = mob;
+                    targetType = 'mob';
+                }
+            });
             
             if (nearest) {
                 attacker.setData('lastAttack', time);
