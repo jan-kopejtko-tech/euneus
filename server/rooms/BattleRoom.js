@@ -99,11 +99,11 @@ class BattleRoom extends Room {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
       
-      // Flatten ally array: [x1,y1,a1, x2,y2,a2, ...]
+      // Flatten ally array: [x1,y1,a1,isArcher1, x2,y2,a2,isArcher2, ...]
       const flat = [];
       if (message.allies && Array.isArray(message.allies)) {
         message.allies.forEach(ally => {
-          flat.push(ally.x, ally.y, ally.angle);
+          flat.push(ally.x, ally.y, ally.angle, ally.isArcher ? 1 : 0);
         });
       }
       

@@ -174,19 +174,24 @@ async function connectToMultiplayer() {
                     }
                     
                     const allySprites = otherPlayerAllies[sessionId];
-                    const allyCount = Math.floor(serverPlayer.allyData.length / 3);
+                    const allyCount = Math.floor(serverPlayer.allyData.length / 4); // Now 4 values per ally
                     
                     // Create/update ally sprites
                     for (let i = 0; i < allyCount; i++) {
-                        const x = serverPlayer.allyData[i * 3];
-                        const y = serverPlayer.allyData[i * 3 + 1];
-                        const angle = serverPlayer.allyData[i * 3 + 2];
+                        const x = serverPlayer.allyData[i * 4];
+                        const y = serverPlayer.allyData[i * 4 + 1];
+                        const angle = serverPlayer.allyData[i * 4 + 2];
+                        const isArcher = serverPlayer.allyData[i * 4 + 3] === 1;
                         
                         if (!allySprites[i]) {
-                            // Create new ally sprite
-                            const allySprite = gameScene.physics.add.sprite(x, y, 'knight');
+                            // Create new ally sprite with correct texture
+                            const texture = isArcher ? 'archer' : 'knight';
+                            const allySprite = gameScene.physics.add.sprite(x, y, texture);
                             allySprite.setTint(0xff4444); // Red tint
                             allySprite.setData('team', 'red');
+                            allySprite.setData('isArcher', isArcher);
+                            allySprite.setData('hp', isArcher ? 5 : 10);
+                            allySprite.setData('maxHp', isArcher ? 5 : 10);
                             allySprites[i] = allySprite;
                         } else {
                             // Update existing ally with interpolation
@@ -624,23 +629,29 @@ function updateConnectionStatus(status, text) {
                             y: player.y,
                             angle: angle
                         });
-                        
-                        // 📡 SEND ALLY POSITIONS (batched in single message)
-                        const allyPositions = allies.children.entries
-                            .filter(ally => ally && ally.active)
-                            .slice(0, 100) // Cap at 100 allies
-                            .map(ally => ({
-                                x: ally.x,
-                                y: ally.y,
-                                angle: ally.rotation
-                            }));
-                        
-                        room.send("update_allies", {
-                            allies: allyPositions
-                        });
                     }
                 } else {
                     player.setVelocity(0, 0);
+                }
+                
+                // 📡 SEND ALLY POSITIONS (outside movement check - always sync)
+                const now = Date.now();
+                if (room && room.sessionId && (now - lastInputSent) >= INPUT_SEND_INTERVAL) {
+                    lastInputSent = now;
+                    
+                    const allyPositions = allies.children.entries
+                        .filter(ally => ally && ally.active)
+                        .slice(0, 100) // Cap at 100 allies
+                        .map(ally => ({
+                            x: ally.x,
+                            y: ally.y,
+                            angle: ally.rotation,
+                            isArcher: ally.getData('isArcher') || false
+                        }));
+                    
+                    room.send("update_allies", {
+                        allies: allyPositions
+                    });
                 }
                 
                 // Keep in world bounds
@@ -1108,28 +1119,14 @@ function updateConnectionStatus(status, text) {
             });
             
             // Check enemy units (if attacker is on a team)
-            if (attackerTeam) {
-                const enemyGroup = attackerTeam === 'blue' ? enemyAllies : allies;
-                const enemyHero = attackerTeam === 'blue' ? enemyPlayer : player;
+            if (attackerTeam === 'blue') {
+                // Player team attacks red team (other players)
                 
-                // Check enemy units
-                enemyGroup.children.entries.forEach(enemy => {
-                    if (!enemy || !enemy.active) return;
+                // Check other players
+                for (let sessionId in otherPlayers) {
+                    const enemyHero = otherPlayers[sessionId];
+                    if (!enemyHero || !enemyHero.active) continue;
                     
-                    const dist = Phaser.Math.Distance.Between(
-                        attacker.x, attacker.y,
-                        enemy.x, enemy.y
-                    );
-                    
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = enemy;
-                        targetType = 'unit';
-                    }
-                });
-                
-                // Check enemy hero
-                if (enemyHero && enemyHero.active) {
                     const dist = Phaser.Math.Distance.Between(
                         attacker.x, attacker.y,
                         enemyHero.x, enemyHero.y
@@ -1140,6 +1137,25 @@ function updateConnectionStatus(status, text) {
                         nearest = enemyHero;
                         targetType = 'player';
                     }
+                }
+                
+                // Check other players' allies
+                for (let sessionId in otherPlayerAllies) {
+                    const enemyAllies = otherPlayerAllies[sessionId];
+                    enemyAllies.forEach(enemy => {
+                        if (!enemy || !enemy.active) return;
+                        
+                        const dist = Phaser.Math.Distance.Between(
+                            attacker.x, attacker.y,
+                            enemy.x, enemy.y
+                        );
+                        
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = enemy;
+                            targetType = 'unit';
+                        }
+                    });
                 }
             }
             
