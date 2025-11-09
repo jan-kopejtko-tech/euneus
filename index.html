@@ -20,9 +20,26 @@
         #game-container {
             box-shadow: 0 0 40px rgba(200, 150, 50, 0.4);
         }
+        #connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        .connected { color: #00ff00; }
+        .disconnected { color: #ff0000; }
+        .connecting { color: #ffaa00; }
     </style>
 </head>
 <body>
+    <div id="connection-status">
+        <span class="connecting">🔄 Connecting...</span>
+    </div>
     <div id="game-container"></div>
     
     <script>
@@ -66,6 +83,7 @@
         
         let killText;
         let armyText;
+        let playerCountText;
         
         // Death screen elements
         let deathOverlay;
@@ -77,15 +95,143 @@ const SERVER_URL = "wss://euneus-production.up.railway.app";
 
 let client = new Colyseus.Client(SERVER_URL);
 let room;
+let myPlayerId;
+let otherPlayers = {}; // Map of sessionId -> sprite
+let gameScene; // Reference to Phaser scene
 
 async function connectToMultiplayer() {
-    room = await client.joinOrCreate("battle");
-    console.log("Connected!");
+    try {
+        console.log("🔄 Connecting to server:", SERVER_URL);
+        
+        room = await client.joinOrCreate("battle");
+        myPlayerId = room.sessionId;
+        
+        console.log("✅ Connected! Room ID:", room.id);
+        console.log("✅ My Player ID:", myPlayerId);
+        
+        // Update connection status UI
+        updateConnectionStatus('connected', `✅ Connected | Room: ${room.id.slice(0,8)}`);
+        
+        // Handle initial state message
+        room.onMessage("init", (message) => {
+            console.log("📦 Received init message:", message);
+            myPlayerId = message.playerId;
+        });
+        
+        // Listen for state changes (other players, mobs, etc.)
+        room.onStateChange((state) => {
+            if (!gameScene) return;
+            
+            // Update player count
+            const playerCount = Object.keys(state.players).length;
+            if (playerCountText) {
+                playerCountText.setText(`Players: ${playerCount}`);
+            }
+            
+            // Sync other players
+            for (let sessionId in state.players) {
+                if (sessionId === myPlayerId) continue; // Skip our own player
+                
+                const serverPlayer = state.players[sessionId];
+                
+                // Create sprite for new player
+                if (!otherPlayers[sessionId]) {
+                    console.log("➕ Creating other player:", sessionId);
+                    const sprite = gameScene.physics.add.sprite(
+                        serverPlayer.x,
+                        serverPlayer.y,
+                        'player'
+                    );
+                    sprite.setTint(0xff4444); // Red tint for other players
+                    sprite.setData('hp', serverPlayer.hp);
+                    sprite.setData('maxHp', serverPlayer.maxHp);
+                    sprite.setData('team', 'red');
+                    sprite.setData('isOtherPlayer', true);
+                    otherPlayers[sessionId] = sprite;
+                } else {
+                    // Update existing player
+                    const sprite = otherPlayers[sessionId];
+                    if (sprite && sprite.active) {
+                        // Smooth position update
+                        sprite.setPosition(serverPlayer.x, serverPlayer.y);
+                        sprite.setRotation(serverPlayer.angle + Math.PI / 2);
+                        sprite.setData('hp', serverPlayer.hp);
+                    }
+                }
+            }
+            
+            // Remove disconnected players
+            for (let sessionId in otherPlayers) {
+                if (!state.players[sessionId]) {
+                    console.log("➖ Removing disconnected player:", sessionId);
+                    if (otherPlayers[sessionId]) {
+                        otherPlayers[sessionId].destroy();
+                    }
+                    delete otherPlayers[sessionId];
+                }
+            }
+        });
+        
+        // Handle damage events
+        room.onMessage("damage", (message) => {
+            console.log("💥 Damage event:", message);
+        });
+        
+        // Handle mob killed
+        room.onMessage("mob_killed", (message) => {
+            console.log("👹 Mob killed by:", message.killerId);
+            
+            if (message.killerId === myPlayerId) {
+                // We killed a mob!
+                kills++;
+                killText.setText(`Kills: ${kills}`);
+                
+                if (kills >= nextAllyAt) {
+                    spawnAlly(gameScene);
+                    nextAllyAt += 3;
+                }
+            }
+        });
+        
+        // Handle player killed
+        room.onMessage("player_killed", (message) => {
+            console.log("💀 Player killed:", message);
+            
+            if (message.playerId === myPlayerId) {
+                showDeathScreen(gameScene);
+            }
+        });
+        
+        // Handle disconnect
+        room.onLeave((code) => {
+            console.log("⚠️ Left room with code:", code);
+            updateConnectionStatus('disconnected', '❌ Disconnected');
+        });
+        
+        room.onError((code, message) => {
+            console.error("❌ Room error:", code, message);
+            updateConnectionStatus('disconnected', `❌ Error: ${message}`);
+        });
+        
+    } catch (error) {
+        console.error("❌ Failed to connect:", error);
+        updateConnectionStatus('disconnected', '❌ Connection failed');
+    }
+}
+
+function updateConnectionStatus(status, text) {
+    const statusEl = document.getElementById('connection-status');
+    if (statusEl) {
+        statusEl.innerHTML = `<span class="${status}">${text}</span>`;
+    }
 }
 
         function preload() {}
 
         function create() {
+            // Store scene reference for multiplayer callbacks
+            gameScene = this;
+            
             // Set world bounds to large size
             this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
             
@@ -157,31 +303,8 @@ async function connectToMultiplayer() {
             
             // Create groups
             allies = this.physics.add.group();
-            enemyAllies = this.physics.add.group(); // Enemy army
+            enemyAllies = this.physics.add.group(); // Enemy army (now from multiplayer)
             mobs = this.physics.add.group();
-            
-            // CREATE ENEMY PLAYER (in bottom-right corner)
-            enemyPlayer = this.physics.add.sprite(WORLD_WIDTH - 500, WORLD_HEIGHT - 500, 'player');
-            enemyPlayer.setTint(0xff4444); // Red tint for enemy
-            enemyPlayer.setData('hp', 100);
-            enemyPlayer.setData('maxHp', 100);
-            enemyPlayer.setData('damage', 20);
-            enemyPlayer.setData('attackRange', 80);
-            enemyPlayer.setData('attackSpeed', 500);
-            enemyPlayer.setData('lastAttack', 0);
-            enemyPlayer.setData('isPlayer', true);
-            enemyPlayer.setData('team', 'red');
-            enemyPlayer.setData('facingAngle', Math.PI); // Face left initially
-            
-            // Spawn 50 knights for enemy
-            for (let i = 0; i < 50; i++) {
-                spawnEnemyAlly(this, 'knight', i);
-            }
-            
-            // Spawn 50 archers for enemy
-            for (let i = 0; i < 50; i++) {
-                spawnEnemyAlly(this, 'archer', i + 50);
-            }
             
             // Spawn initial mobs across the larger world
             for (let i = 0; i < 80; i++) {
@@ -203,6 +326,14 @@ async function connectToMultiplayer() {
             armyText = this.add.text(20, 60, 'Army: 1', {
                 fontSize: '28px',
                 color: '#ffaa00',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setScrollFactor(0); // Fixed to camera
+            
+            playerCountText = this.add.text(20, 100, 'Players: 1', {
+                fontSize: '24px',
+                color: '#00ffff',
                 fontStyle: 'bold',
                 stroke: '#000000',
                 strokeThickness: 4
@@ -299,6 +430,10 @@ async function connectToMultiplayer() {
                 },
                 loop: true
             });
+            
+            // 🚀 CONNECT TO MULTIPLAYER SERVER
+            console.log("✅ Game scene created, connecting to multiplayer...");
+            connectToMultiplayer();
         }
 
         // Helper function to create emoji textures
@@ -346,6 +481,15 @@ async function connectToMultiplayer() {
                     
                     // Store facing angle for formation
                     player.setData('facingAngle', angle);
+                    
+                    // 📡 SEND POSITION TO SERVER
+                    if (room && room.sessionId) {
+                        room.send("move", {
+                            x: player.x,
+                            y: player.y,
+                            angle: angle
+                        });
+                    }
                 } else {
                     player.setVelocity(0, 0);
                 }
@@ -364,38 +508,7 @@ async function connectToMultiplayer() {
             const newZoom = currentZoom + (targetZoom - currentZoom) * 0.05; // Smooth zoom
             game.scene.scenes[0].cameras.main.setZoom(newZoom);
             
-            // ENEMY PLAYER AI - Simple movement toward player
-            if (enemyPlayer && enemyPlayer.active && player && player.active) {
-                const distToPlayer = Phaser.Math.Distance.Between(
-                    enemyPlayer.x, enemyPlayer.y,
-                    player.x, player.y
-                );
-                
-                // Move toward player if far, stop if close
-                if (distToPlayer > 400) {
-                    const angle = Phaser.Math.Angle.Between(
-                        enemyPlayer.x, enemyPlayer.y,
-                        player.x, player.y
-                    );
-                    
-                    enemyPlayer.rotation = angle + Math.PI / 2;
-                    enemyPlayer.setVelocity(
-                        Math.cos(angle) * 180,
-                        Math.sin(angle) * 180
-                    );
-                    enemyPlayer.setData('facingAngle', angle);
-                } else {
-                    enemyPlayer.setVelocity(0, 0);
-                }
-                
-                enemyPlayer.x = Phaser.Math.Clamp(enemyPlayer.x, 30, WORLD_WIDTH - 30);
-                enemyPlayer.y = Phaser.Math.Clamp(enemyPlayer.y, 30, WORLD_HEIGHT - 30);
-                
-                autoAttack(game.scene.scenes[0], enemyPlayer, time);
-            }
-            
-            // ENEMY ARMY FORMATION
-            updateEnemyFormation(time);
+            // Update other players (they will be moved by server state)
             
             // RENDER HEALTH BARS for all units with HP
             renderHealthBars(game.scene.scenes[0]);
