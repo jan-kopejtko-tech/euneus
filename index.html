@@ -276,6 +276,28 @@ async function connectToMultiplayer() {
         room.onMessage("mob_killed", (message) => {
             console.log("👹 Mob killed by:", message.killerId);
             
+            // Find and show death effect for the mob
+            const mobSprite = serverMobs[message.mobId];
+            if (mobSprite && mobSprite.active) {
+                // Death explosion
+                for (let i = 0; i < 8; i++) {
+                    const particle = gameScene.add.circle(
+                        mobSprite.x, mobSprite.y, 
+                        3 + Math.random() * 3, 
+                        0xff4444
+                    );
+                    const angle = (Math.PI * 2 * i) / 8;
+                    gameScene.tweens.add({
+                        targets: particle,
+                        x: mobSprite.x + Math.cos(angle) * 40,
+                        y: mobSprite.y + Math.sin(angle) * 40,
+                        alpha: 0,
+                        duration: 400,
+                        onComplete: () => particle.destroy()
+                    });
+                }
+            }
+            
             if (message.killerId === myPlayerId) {
                 // We killed a mob!
                 kills++;
@@ -1212,9 +1234,24 @@ function updateConnectionStatus(status, text) {
         function damageMob(scene, mob, damage) {
             if (!mob || !mob.active) return;
             
-            const hp = mob.getData('hp') - damage;
-            mob.setData('hp', hp);
+            // Get mobId from server sync
+            let mobId = null;
+            for (let id in serverMobs) {
+                if (serverMobs[id] === mob) {
+                    mobId = id;
+                    break;
+                }
+            }
             
+            if (!mobId || !room) return;
+            
+            // Send attack to server instead of applying damage locally
+            room.send("attack", {
+                targetId: mobId,
+                targetType: 'mob'
+            });
+            
+            // Visual feedback only (server handles actual damage)
             mob.setTint(0xffffff);
             scene.time.delayedCall(80, () => {
                 if (mob && mob.active) mob.clearTint();
@@ -1236,43 +1273,15 @@ function updateConnectionStatus(status, text) {
                     onComplete: () => blood.destroy()
                 });
             }
-            
-            if (hp <= 0) {
-                // Death explosion
-                for (let i = 0; i < 8; i++) {
-                    const particle = scene.add.circle(
-                        mob.x, mob.y, 
-                        3 + Math.random() * 3, 
-                        0xff4444
-                    );
-                    const angle = (Math.PI * 2 * i) / 8;
-                    scene.tweens.add({
-                        targets: particle,
-                        x: mob.x + Math.cos(angle) * 40,
-                        y: mob.y + Math.sin(angle) * 40,
-                        alpha: 0,
-                        duration: 400,
-                        onComplete: () => particle.destroy()
-                    });
-                }
-                
-                mob.destroy();
-                kills++;
-                killText.setText(`Kills: ${kills}`);
-                
-                if (kills >= nextAllyAt) {
-                    spawnAlly(scene);
-                    nextAllyAt += 3;
-                }
-                
-                scene.time.delayedCall(2500, () => {
-                    spawnMob(scene);
-                });
-            }
         }
 
         function spawnAlly(scene) {
             if (!player || !player.active) return;
+            
+            // Cap at 100 allies
+            if (allies.children.entries.length >= 100) {
+                return;
+            }
             
             const isArcher = Math.random() < 0.4;
             const texture = isArcher ? 'archer' : 'knight';
