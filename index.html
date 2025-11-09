@@ -319,6 +319,24 @@ async function connectToMultiplayer() {
             }
         });
         
+        // Handle player respawn
+        room.onMessage("player_respawned", (message) => {
+            console.log("🔄 Player respawned:", message.playerId);
+            
+            if (message.playerId === myPlayerId) {
+                // Hide death screen, reset player
+                if (gameScene.deathOverlay) gameScene.deathOverlay.setVisible(false);
+                if (gameScene.deathText) gameScene.deathText.setVisible(false);
+                if (gameScene.retryButton) gameScene.retryButton.setVisible(false);
+                if (gameScene.retryBg) gameScene.retryBg.setVisible(false);
+                
+                player.setVisible(true);
+                player.body.enable = true;
+                player.setData('hp', 100);
+                isPlayerDead = false;
+            }
+        });
+        
         // Handle disconnect
         room.onLeave((code) => {
             console.log("⚠️ Left room with code:", code);
@@ -889,6 +907,29 @@ function updateConnectionStatus(status, text) {
             enemyAllies.children.entries.forEach(ally => {
                 drawHealthBar(ally, -30);
             });
+            
+            // Draw health bars for other players
+            for (let sessionId in otherPlayers) {
+                const otherPlayer = otherPlayers[sessionId];
+                if (otherPlayer && otherPlayer.active) {
+                    drawHealthBar(otherPlayer, -40);
+                }
+            }
+            
+            // Draw health bars for other players' allies
+            for (let sessionId in otherPlayerAllies) {
+                const allies = otherPlayerAllies[sessionId];
+                allies.forEach(ally => {
+                    if (ally && ally.active) {
+                        drawHealthBar(ally, -30);
+                    }
+                });
+            }
+            
+            // Draw health bars for mobs
+            mobs.children.entries.forEach(mob => {
+                drawHealthBar(mob, -30);
+            });
         }
 
         function updateEnemyFormation(time) {
@@ -1162,6 +1203,25 @@ function updateConnectionStatus(status, text) {
         function damageUnit(scene, unit, damage, unitType) {
             if (!unit || !unit.active) return;
             
+            // If attacking another player, send to server
+            if (unitType === 'player' && unit.getData('isOtherPlayer')) {
+                let targetPlayerId = null;
+                for (let sessionId in otherPlayers) {
+                    if (otherPlayers[sessionId] === unit) {
+                        targetPlayerId = sessionId;
+                        break;
+                    }
+                }
+                
+                if (targetPlayerId && room) {
+                    room.send("attack", {
+                        targetId: targetPlayerId,
+                        targetType: 'player'
+                    });
+                }
+            }
+            
+            // Visual feedback
             const hp = unit.getData('hp') - damage;
             unit.setData('hp', hp);
             

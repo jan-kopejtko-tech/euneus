@@ -197,7 +197,8 @@ class BattleRoom extends Room {
     
     if (targetType === 'mob') {
       target = this.state.mobs.get(targetId);
-      if (!target) return;
+      if (!target) return; // Already dead
+      if (target.hp <= 0) return; // Already dying
       
       target.hp -= damage;
       
@@ -224,6 +225,7 @@ class BattleRoom extends Room {
     else if (targetType === 'player') {
       target = this.state.players.get(targetId);
       if (!target) return;
+      if (target.hp <= 0) return; // Already dead
       
       target.hp -= damage;
       
@@ -236,10 +238,26 @@ class BattleRoom extends Room {
       
       // Player died
       if (target.hp <= 0) {
+        attacker.kills++;
+        
         this.broadcast("player_killed", {
           playerId: targetId,
           killerId: attackerId
         });
+        
+        // Respawn after delay
+        setTimeout(() => {
+          if (this.state.players.has(targetId)) {
+            const deadPlayer = this.state.players.get(targetId);
+            deadPlayer.hp = deadPlayer.maxHp;
+            deadPlayer.x = this.WORLD_WIDTH / 2 + (Math.random() - 0.5) * 500;
+            deadPlayer.y = this.WORLD_HEIGHT / 2 + (Math.random() - 0.5) * 500;
+            
+            this.broadcast("player_respawned", {
+              playerId: targetId
+            });
+          }
+        }, 3000);
       }
     }
   }
