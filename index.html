@@ -1789,12 +1789,6 @@ function updateConnectionStatus(status, text) {
             
             if (!mobId || !room) return;
             
-            // Throttle attacks per mob to prevent spam (100ms cooldown per mob)
-            const now = Date.now();
-            if (!mob.lastAttackSent) mob.lastAttackSent = 0;
-            if (now - mob.lastAttackSent < 100) return;
-            mob.lastAttackSent = now;
-            
             // Send attack to server instead of applying damage locally
             room.send("attack", {
                 targetId: mobId,
