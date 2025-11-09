@@ -569,12 +569,14 @@ function updateConnectionStatus(status, text) {
             });
             
             // DEATH SCREEN (hidden initially)
-            deathOverlay = this.add.rectangle(600, 400, 1200, 800, 0x000000, 0.8)
+            // Use camera dimensions for proper positioning
+            deathOverlay = this.add.rectangle(0, 0, this.cameras.main.width * 2, this.cameras.main.height * 2, 0x000000, 0.8)
+                .setOrigin(0)
                 .setScrollFactor(0)
                 .setDepth(1000)
                 .setVisible(false);
             
-            deathText = this.add.text(600, 300, 'YOU DIED', {
+            deathText = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 - 100, 'YOU DIED', {
                 fontSize: '72px',
                 color: '#ff0000',
                 fontStyle: 'bold',
@@ -582,13 +584,13 @@ function updateConnectionStatus(status, text) {
                 strokeThickness: 8
             }).setOrigin(0.5).setScrollFactor(0).setDepth(1001).setVisible(false);
             
-            const retryBg = this.add.rectangle(600, 420, 200, 60, 0x444444)
+            const retryBg = this.add.rectangle(this.cameras.main.width / 2, this.cameras.main.height / 2 + 20, 200, 60, 0x444444)
                 .setScrollFactor(0)
                 .setDepth(1001)
                 .setVisible(false)
                 .setInteractive({ useHandCursor: true });
             
-            retryButton = this.add.text(600, 420, 'RETRY', {
+            retryButton = this.add.text(this.cameras.main.width / 2, this.cameras.main.height / 2 + 20, 'RETRY', {
                 fontSize: '32px',
                 color: '#ffffff',
                 fontStyle: 'bold'
@@ -908,13 +910,18 @@ function updateConnectionStatus(status, text) {
             scene.retryButton.setVisible(true);
             scene.retryBg.setVisible(true);
             
-            // Add final stats
-            const statsText = scene.add.text(600, 360, `Kills: ${kills}  •  Army Size: ${allies.children.entries.length + 1}`, {
-                fontSize: '24px',
-                color: '#ffaa00',
-                stroke: '#000000',
-                strokeThickness: 4
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+            // Add final stats (below YOU DIED text)
+            const statsText = scene.add.text(
+                scene.cameras.main.width / 2, 
+                scene.cameras.main.height / 2 - 40, 
+                `Kills: ${kills}  •  Army Size: ${allies.children.entries.length + 1}`, 
+                {
+                    fontSize: '24px',
+                    color: '#ffaa00',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }
+            ).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
         }
 
         function renderHealthBars(scene) {
