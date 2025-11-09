@@ -40,6 +40,128 @@
     <div id="connection-status">
         <span class="connecting">🔄 Connecting...</span>
     </div>
+    
+    <!-- Hero Class Selection Screen -->
+    <div id="class-selection" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 5000; display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif;">
+        <div style="text-align: center; color: white;">
+            <h1 style="font-size: 48px; margin-bottom: 40px; color: #ffd700;">Choose Your Hero</h1>
+            <div style="display: flex; gap: 40px; justify-content: center;">
+                <!-- Tank -->
+                <div class="hero-card" data-class="tank" style="width: 250px; padding: 30px; background: #2a2a2a; border: 3px solid #555; border-radius: 15px; cursor: pointer; transition: all 0.3s;">
+                    <div style="font-size: 80px; margin-bottom: 15px;">🛡️</div>
+                    <h2 style="color: #4dabf7; font-size: 32px; margin: 10px 0;">TANK</h2>
+                    <div style="color: #aaa; font-size: 16px; margin: 15px 0;">
+                        <div>❤️ HP: <span style="color: #00ff00;">200</span></div>
+                        <div>⚔️ Damage: <span style="color: #ffaa00;">15</span></div>
+                        <div>⚡ Speed: <span style="color: #ff6b6b;">Slow</span></div>
+                        <div>🎯 Range: <span style="color: #ffaa00;">Short</span></div>
+                    </div>
+                    <div style="margin-top: 15px; color: #ffd700; font-size: 14px;">💪 High survivability</div>
+                </div>
+                
+                <!-- Assassin -->
+                <div class="hero-card" data-class="assassin" style="width: 250px; padding: 30px; background: #2a2a2a; border: 3px solid #555; border-radius: 15px; cursor: pointer; transition: all 0.3s;">
+                    <div style="font-size: 80px; margin-bottom: 15px;">⚔️</div>
+                    <h2 style="color: #ff6b6b; font-size: 32px; margin: 10px 0;">ASSASSIN</h2>
+                    <div style="color: #aaa; font-size: 16px; margin: 15px 0;">
+                        <div>❤️ HP: <span style="color: #ff6b6b;">80</span></div>
+                        <div>⚔️ Damage: <span style="color: #00ff00;">35</span></div>
+                        <div>⚡ Speed: <span style="color: #00ff00;">Fast</span></div>
+                        <div>🎯 Range: <span style="color: #ffaa00;">Short</span></div>
+                    </div>
+                    <div style="margin-top: 15px; color: #ffd700; font-size: 14px;">⚡ High damage output</div>
+                </div>
+                
+                <!-- Mage -->
+                <div class="hero-card" data-class="mage" style="width: 250px; padding: 30px; background: #2a2a2a; border: 3px solid #555; border-radius: 15px; cursor: pointer; transition: all 0.3s;">
+                    <div style="font-size: 80px; margin-bottom: 15px;">🔮</div>
+                    <h2 style="color: #a78bfa; font-size: 32px; margin: 10px 0;">MAGE</h2>
+                    <div style="color: #aaa; font-size: 16px; margin: 15px 0;">
+                        <div>❤️ HP: <span style="color: #ffaa00;">100</span></div>
+                        <div>⚔️ Damage: <span style="color: #00ff00;">25</span></div>
+                        <div>⚡ Speed: <span style="color: #ffaa00;">Normal</span></div>
+                        <div>🎯 Range: <span style="color: #00ff00;">Long</span></div>
+                    </div>
+                    <div style="margin-top: 15px; color: #ffd700; font-size: 14px;">🎯 Long range attacks</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hero Stats HUD -->
+    <div id="hero-hud" style="position: fixed; top: 20px; left: 20px; z-index: 4000; font-family: Arial, sans-serif; pointer-events: none; display: none;">
+        <div style="background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border: 2px solid #ffd700; min-width: 250px;">
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                <div id="hero-icon" style="font-size: 48px;">🛡️</div>
+                <div>
+                    <div id="hero-class" style="color: #ffd700; font-size: 24px; font-weight: bold;">TANK</div>
+                    <div id="hero-level" style="color: #00ff00; font-size: 18px;">Level 1</div>
+                </div>
+            </div>
+            
+            <!-- HP Bar -->
+            <div style="margin: 8px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 14px; color: white; margin-bottom: 3px;">
+                    <span>❤️ HP</span>
+                    <span id="hp-text">100/100</span>
+                </div>
+                <div style="width: 100%; height: 20px; background: #333; border-radius: 10px; overflow: hidden;">
+                    <div id="hp-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #ff6b6b); transition: width 0.3s;"></div>
+                </div>
+            </div>
+            
+            <!-- XP Bar -->
+            <div style="margin: 8px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 14px; color: white; margin-bottom: 3px;">
+                    <span>⭐ XP</span>
+                    <span id="xp-text">0/100</span>
+                </div>
+                <div style="width: 100%; height: 15px; background: #333; border-radius: 10px; overflow: hidden;">
+                    <div id="xp-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ffd700, #ffaa00); transition: width 0.3s;"></div>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div style="margin-top: 10px; font-size: 14px; color: #aaa;">
+                <div style="display: flex; justify-content: space-between; margin: 3px 0;">
+                    <span>⚔️ Damage:</span>
+                    <span id="stat-damage" style="color: white;">20</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 3px 0;">
+                    <span>⚡ Speed:</span>
+                    <span id="stat-speed" style="color: white;">220</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 3px 0;">
+                    <span>🎯 Range:</span>
+                    <span id="stat-range" style="color: white;">80</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin: 3px 0;">
+                    <span>👥 Army:</span>
+                    <span id="stat-army" style="color: white;">1</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Abilities -->
+        <div id="abilities-bar" style="margin-top: 15px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
+            <div style="display: flex; gap: 10px;">
+                <div class="ability" data-key="Q" style="width: 60px; height: 60px; background: #2a2a2a; border: 2px solid #666; border-radius: 8px; position: relative; cursor: pointer;">
+                    <div style="font-size: 32px; text-align: center; line-height: 56px;">💨</div>
+                    <div style="position: absolute; bottom: 2px; right: 4px; font-size: 12px; color: white; font-weight: bold;">Q</div>
+                    <div class="ability-cooldown" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); border-radius: 6px; display: none; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold;"></div>
+                </div>
+                <div class="ability" data-key="E" style="width: 60px; height: 60px; background: #2a2a2a; border: 2px solid #666; border-radius: 8px; position: relative; cursor: pointer;">
+                    <div style="font-size: 32px; text-align: center; line-height: 56px;">💥</div>
+                    <div style="position: absolute; bottom: 2px; right: 4px; font-size: 12px; color: white; font-weight: bold;">E</div>
+                    <div class="ability-cooldown" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); border-radius: 6px; display: none; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold;"></div>
+                </div>
+            </div>
+            <div style="color: #aaa; font-size: 11px; margin-top: 5px; text-align: center;">
+                Q: Dash | E: AOE Attack
+            </div>
+        </div>
+    </div>
+    
     <div id="game-container"></div>
     
     <script>
@@ -63,7 +185,8 @@
             }
         };
 
-        const game = new Phaser.Game(config);
+        // Game will start after class selection
+        // const game = new Phaser.Game(config);
 
         // WORLD SIZE - Much larger like agar.io
         const WORLD_WIDTH = 4000;
@@ -85,6 +208,12 @@
         let armyText;
         let playerCountText;
         
+        // Power-ups
+        let powerups = null;
+        
+        // Bosses
+        let bosses = null;
+        
         // Throttle position updates (conservative to avoid rate limits)
         let lastInputSent = 0;
         const INPUT_SEND_INTERVAL = 100; // Send every 100ms (~10 times per second)
@@ -104,6 +233,150 @@ let otherPlayers = {}; // Map of sessionId -> sprite
 let otherPlayerAllies = {}; // Map of sessionId -> array of ally sprites
 let serverMobs = {}; // Map of mobId -> sprite
 let gameScene; // Reference to Phaser scene
+
+// Hero class system
+let selectedClass = null;
+let heroStats = {
+    level: 1,
+    xp: 0,
+    xpToNext: 100,
+    maxHp: 100,
+    hp: 100,
+    damage: 20,
+    speed: 220,
+    range: 80
+};
+
+// Class configurations
+const CLASS_CONFIGS = {
+    tank: {
+        icon: '🛡️',
+        maxHp: 200,
+        damage: 15,
+        speed: 180,
+        range: 70,
+        color: 0x4dabf7
+    },
+    assassin: {
+        icon: '⚔️',
+        maxHp: 80,
+        damage: 35,
+        speed: 280,
+        range: 75,
+        color: 0xff6b6b
+    },
+    mage: {
+        icon: '🔮',
+        maxHp: 100,
+        damage: 25,
+        speed: 220,
+        range: 150,
+        color: 0xa78bfa
+    }
+};
+
+// Abilities cooldowns
+let abilities = {
+    dash: { cooldown: 5000, lastUsed: 0, key: 'Q' },
+    aoe: { cooldown: 10000, lastUsed: 0, key: 'E' }
+};
+
+// Class selection
+document.addEventListener('DOMContentLoaded', () => {
+    const heroCards = document.querySelectorAll('.hero-card');
+    
+    heroCards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'scale(1.05)';
+            card.style.borderColor = '#ffd700';
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'scale(1)';
+            card.style.borderColor = '#555';
+        });
+        
+        card.addEventListener('click', () => {
+            selectedClass = card.dataset.class;
+            const config = CLASS_CONFIGS[selectedClass];
+            
+            // Apply class stats
+            heroStats.maxHp = config.maxHp;
+            heroStats.hp = config.maxHp;
+            heroStats.damage = config.damage;
+            heroStats.speed = config.speed;
+            heroStats.range = config.range;
+            
+            // Hide class selection
+            document.getElementById('class-selection').style.display = 'none';
+            document.getElementById('hero-hud').style.display = 'block';
+            
+            // Update HUD
+            document.getElementById('hero-icon').textContent = config.icon;
+            document.getElementById('hero-class').textContent = selectedClass.toUpperCase();
+            updateHeroHUD();
+            
+            // Start game
+            startGame();
+        });
+    });
+});
+
+function updateHeroHUD() {
+    document.getElementById('hero-level').textContent = `Level ${heroStats.level}`;
+    document.getElementById('hp-text').textContent = `${Math.round(heroStats.hp)}/${heroStats.maxHp}`;
+    document.getElementById('hp-bar').style.width = `${(heroStats.hp / heroStats.maxHp) * 100}%`;
+    document.getElementById('xp-text').textContent = `${heroStats.xp}/${heroStats.xpToNext}`;
+    document.getElementById('xp-bar').style.width = `${(heroStats.xp / heroStats.xpToNext) * 100}%`;
+    document.getElementById('stat-damage').textContent = heroStats.damage;
+    document.getElementById('stat-speed').textContent = heroStats.speed;
+    document.getElementById('stat-range').textContent = heroStats.range;
+    document.getElementById('stat-army').textContent = allies ? allies.children.entries.length + 1 : 1;
+}
+
+function gainXP(amount) {
+    heroStats.xp += amount;
+    
+    // Level up
+    while (heroStats.xp >= heroStats.xpToNext) {
+        heroStats.xp -= heroStats.xpToNext;
+        heroStats.level++;
+        heroStats.xpToNext = Math.floor(heroStats.xpToNext * 1.5);
+        
+        // Stat increases on level up
+        heroStats.maxHp += 10;
+        heroStats.hp = heroStats.maxHp;
+        heroStats.damage += 2;
+        heroStats.range += 2;
+        
+        // Level up effect
+        if (player && player.active) {
+            const levelUpText = gameScene.add.text(player.x, player.y - 50, 'LEVEL UP!', {
+                fontSize: '32px',
+                color: '#ffd700',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 6
+            }).setOrigin(0.5);
+            
+            gameScene.tweens.add({
+                targets: levelUpText,
+                y: player.y - 100,
+                alpha: 0,
+                duration: 2000,
+                onComplete: () => levelUpText.destroy()
+            });
+        }
+    }
+    
+    updateHeroHUD();
+}
+
+function startGame() {
+    // Start Phaser game
+    const game = new Phaser.Game(config);
+    connectToMultiplayer();
+}
 
 async function connectToMultiplayer() {
     try {
@@ -318,6 +591,9 @@ async function connectToMultiplayer() {
                 kills++;
                 killText.setText(`Kills: ${kills}`);
                 
+                // Gain XP
+                gainXP(10);
+                
                 if (kills >= nextAllyAt) {
                     spawnAlly(gameScene);
                     nextAllyAt += 3;
@@ -442,6 +718,10 @@ function updateConnectionStatus(status, text) {
             createEmojiTexture(this, 'knight', '⚔️', 56);
             createEmojiTexture(this, 'archer', '🏹', 52);
             createEmojiTexture(this, 'mob', '👹', 48);
+            createEmojiTexture(this, 'boss', '😈', 80);
+            createEmojiTexture(this, 'powerup-speed', '⚡', 40);
+            createEmojiTexture(this, 'powerup-damage', '💪', 40);
+            createEmojiTexture(this, 'powerup-heal', '❤️', 40);
             
             // Attack effects
             const swordGfx = this.add.graphics();
@@ -468,20 +748,22 @@ function updateConnectionStatus(status, text) {
             
             // Create player
             player = this.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 'player');
-            player.setData('hp', 100);
-            player.setData('maxHp', 100);
-            player.setData('damage', 20); // Hero does more damage
-            player.setData('attackRange', 80);
+            player.setData('hp', heroStats.hp);
+            player.setData('maxHp', heroStats.maxHp);
+            player.setData('damage', heroStats.damage);
+            player.setData('attackRange', heroStats.range);
             player.setData('attackSpeed', 500);
             player.setData('lastAttack', 0);
             player.setData('isPlayer', true);
             player.setData('team', 'blue'); // Player team
+            player.setData('heroClass', selectedClass);
             
             // Camera follows player
             this.cameras.main.startFollow(player, true, 0.1, 0.1);
             
-            // Add glow effect to player
-            const glow = this.add.circle(player.x, player.y, 35, 0x3366ff, 0.2);
+            // Add glow effect to player with class color
+            const classColor = CLASS_CONFIGS[selectedClass].color;
+            const glow = this.add.circle(player.x, player.y, 35, classColor, 0.2);
             glow.setBlendMode(Phaser.BlendModes.ADD);
             this.tweens.add({
                 targets: glow,
@@ -503,11 +785,17 @@ function updateConnectionStatus(status, text) {
             allies = this.physics.add.group();
             enemyAllies = this.physics.add.group(); // Enemy army (now from multiplayer)
             mobs = this.physics.add.group();
+            powerups = this.physics.add.group();
+            bosses = this.physics.add.group();
             
             // Mobs will be synced from server
             
             // Input
             pointer = this.input.activePointer;
+            
+            // Keyboard for abilities
+            this.input.keyboard.on('keydown-Q', () => useDashAbility(this));
+            this.input.keyboard.on('keydown-E', () => useAOEAbility(this));
             
             // UI - Fixed to screen with setScrollFactor(0)
             killText = this.add.text(20, 20, 'Kills: 0', {
@@ -627,6 +915,32 @@ function updateConnectionStatus(status, text) {
                 loop: true
             });
             
+            // Spawn power-ups periodically
+            this.time.addEvent({
+                delay: 10000,
+                callback: () => {
+                    spawnPowerup(this);
+                },
+                loop: true
+            });
+            
+            // Spawn initial power-ups
+            for (let i = 0; i < 5; i++) {
+                spawnPowerup(this);
+            }
+            
+            // Spawn boss mobs periodically
+            this.time.addEvent({
+                delay: 20000,
+                callback: () => {
+                    spawnBoss(this);
+                },
+                loop: true
+            });
+            
+            // Spawn initial boss
+            spawnBoss(this);
+            
             // 🚀 CONNECT TO MULTIPLAYER SERVER
             console.log("✅ Game scene created, connecting to multiplayer...");
             connectToMultiplayer();
@@ -659,7 +973,7 @@ function updateConnectionStatus(status, text) {
                     pointer.worldX, pointer.worldY
                 );
                 
-                const speed = 220;
+                const speed = heroStats.speed;
                 
                 if (distance > 20) {
                     const angle = Phaser.Math.Angle.Between(
@@ -730,6 +1044,40 @@ function updateConnectionStatus(status, text) {
             // Update other players (they will be moved by server state)
             // Note: Other players in inactive tabs won't attack (throttled RAF)
             // Only the ACTIVE player's units attack - this is intentional
+            
+            // Update bosses - chase player and attack
+            bosses.children.entries.forEach(boss => {
+                if (!boss || !boss.active || !player || !player.active) return;
+                
+                const dist = Phaser.Math.Distance.Between(boss.x, boss.y, player.x, player.y);
+                
+                if (dist < 400) {
+                    const angle = Phaser.Math.Angle.Between(boss.x, boss.y, player.x, player.y);
+                    boss.setVelocity(Math.cos(angle) * 80, Math.sin(angle) * 80);
+                    autoAttack(game.scene.scenes[0], boss, time);
+                } else {
+                    if (!boss.getData('targetX') || Math.random() < 0.02) {
+                        boss.setData('targetX', Math.random() * WORLD_WIDTH);
+                        boss.setData('targetY', Math.random() * WORLD_HEIGHT);
+                    }
+                    const angle = Phaser.Math.Angle.Between(
+                        boss.x, boss.y,
+                        boss.getData('targetX'),
+                        boss.getData('targetY')
+                    );
+                    boss.setVelocity(Math.cos(angle) * 50, Math.sin(angle) * 50);
+                }
+            });
+            
+            // Check powerup collection
+            powerups.children.entries.forEach(powerup => {
+                if (!powerup || !powerup.active || !player || !player.active) return;
+                
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, powerup.x, powerup.y);
+                if (dist < 40) {
+                    collectPowerup(game.scene.scenes[0], powerup);
+                }
+            });
             
             // RENDER HEALTH BARS for all units with HP
             renderHealthBars(game.scene.scenes[0]);
@@ -1005,6 +1353,11 @@ function updateConnectionStatus(status, text) {
             mobs.children.entries.forEach(mob => {
                 drawHealthBar(mob, -30);
             });
+            
+            // Draw health bars for bosses
+            bosses.children.entries.forEach(boss => {
+                drawHealthBar(boss, -45);
+            });
         }
 
         function updateEnemyFormation(time) {
@@ -1223,6 +1576,22 @@ function updateConnectionStatus(status, text) {
                 }
             });
             
+            // Check bosses
+            bosses.children.entries.forEach(boss => {
+                if (!boss || !boss.active) return;
+                
+                const dist = Phaser.Math.Distance.Between(
+                    attacker.x, attacker.y,
+                    boss.x, boss.y
+                );
+                
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = boss;
+                    targetType = 'boss';
+                }
+            });
+            
             if (nearest) {
                 attacker.setData('lastAttack', time);
                 
@@ -1245,6 +1614,8 @@ function updateConnectionStatus(status, text) {
                             if (nearest && nearest.active) {
                                 if (targetType === 'mob') {
                                     damageMob(scene, nearest, damage);
+                                } else if (targetType === 'boss') {
+                                    damageBoss(scene, nearest, damage);
                                 } else {
                                     damageUnit(scene, nearest, damage, targetType);
                                 }
@@ -1273,6 +1644,8 @@ function updateConnectionStatus(status, text) {
                     
                     if (targetType === 'mob') {
                         damageMob(scene, nearest, damage);
+                    } else if (targetType === 'boss') {
+                        damageBoss(scene, nearest, damage);
                     } else {
                         damageUnit(scene, nearest, damage, targetType);
                     }
@@ -1446,6 +1819,146 @@ function updateConnectionStatus(status, text) {
             }
         }
 
+        function useDashAbility(scene) {
+            if (!player || !player.active || isPlayerDead) return;
+            
+            const now = Date.now();
+            const dashCooldown = abilities.dash.cooldown;
+            const timeSince = now - abilities.dash.lastUsed;
+            
+            if (timeSince < dashCooldown) {
+                // Still on cooldown
+                return;
+            }
+            
+            abilities.dash.lastUsed = now;
+            
+            // Dash in facing direction
+            const angle = player.getData('facingAngle') || 0;
+            const dashDistance = 200;
+            const dashX = player.x + Math.cos(angle) * dashDistance;
+            const dashY = player.y + Math.sin(angle) * dashDistance;
+            
+            // Clamp to world bounds
+            const targetX = Phaser.Math.Clamp(dashX, 30, WORLD_WIDTH - 30);
+            const targetY = Phaser.Math.Clamp(dashY, 30, WORLD_HEIGHT - 30);
+            
+            // Dash animation
+            scene.tweens.add({
+                targets: player,
+                x: targetX,
+                y: targetY,
+                duration: 150,
+                ease: 'Power2'
+            });
+            
+            // Visual effect
+            const dashTrail = scene.add.circle(player.x, player.y, 40, CLASS_CONFIGS[selectedClass].color, 0.5);
+            scene.tweens.add({
+                targets: dashTrail,
+                alpha: 0,
+                scale: 2,
+                duration: 300,
+                onComplete: () => dashTrail.destroy()
+            });
+            
+            // Start cooldown display
+            startAbilityCooldown('Q', dashCooldown);
+        }
+        
+        function useAOEAbility(scene) {
+            if (!player || !player.active || isPlayerDead) return;
+            
+            const now = Date.now();
+            const aoeCooldown = abilities.aoe.cooldown;
+            const timeSince = now - abilities.aoe.lastUsed;
+            
+            if (timeSince < aoeCooldown) {
+                return;
+            }
+            
+            abilities.aoe.lastUsed = now;
+            
+            // AOE damage
+            const aoeRange = 200;
+            const aoeDamage = heroStats.damage * 2;
+            
+            // Visual effect
+            const aoeCircle = scene.add.circle(player.x, player.y, aoeRange, 0xff0000, 0.3);
+            scene.tweens.add({
+                targets: aoeCircle,
+                alpha: 0,
+                scale: 1.3,
+                duration: 500,
+                onComplete: () => aoeCircle.destroy()
+            });
+            
+            // Damage nearby enemies
+            mobs.children.entries.forEach(mob => {
+                if (!mob || !mob.active) return;
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y);
+                if (dist <= aoeRange) {
+                    damageMob(scene, mob, aoeDamage);
+                }
+            });
+            
+            // Damage bosses
+            bosses.children.entries.forEach(boss => {
+                if (!boss || !boss.active) return;
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, boss.x, boss.y);
+                if (dist <= aoeRange) {
+                    damageBoss(scene, boss, aoeDamage);
+                }
+            });
+            
+            // Damage other players
+            for (let sessionId in otherPlayers) {
+                const enemy = otherPlayers[sessionId];
+                if (!enemy || !enemy.active) continue;
+                const dist = Phaser.Math.Distance.Between(player.x, player.y, enemy.x, enemy.y);
+                if (dist <= aoeRange) {
+                    damageUnit(scene, enemy, aoeDamage, 'player');
+                }
+            }
+            
+            // Damage other players' allies
+            for (let sessionId in otherPlayerAllies) {
+                const allies = otherPlayerAllies[sessionId];
+                allies.forEach(ally => {
+                    if (!ally || !ally.active) return;
+                    const dist = Phaser.Math.Distance.Between(player.x, player.y, ally.x, ally.y);
+                    if (dist <= aoeRange) {
+                        damageUnit(scene, ally, aoeDamage, 'unit');
+                    }
+                });
+            }
+            
+            startAbilityCooldown('E', aoeCooldown);
+        }
+        
+        function startAbilityCooldown(key, cooldownMs) {
+            const abilities = document.querySelectorAll('.ability');
+            abilities.forEach(abilityEl => {
+                if (abilityEl.dataset.key === key) {
+                    const cooldownDiv = abilityEl.querySelector('.ability-cooldown');
+                    let remaining = Math.ceil(cooldownMs / 1000);
+                    
+                    cooldownDiv.textContent = remaining;
+                    cooldownDiv.style.display = 'flex';
+                    
+                    const interval = setInterval(() => {
+                        remaining--;
+                        if (remaining <= 0) {
+                            clearInterval(interval);
+                            cooldownDiv.style.display = 'none';
+                        } else {
+                            cooldownDiv.textContent = remaining;
+                        }
+                    }, 1000);
+                }
+            });
+        }
+
         function spawnAlly(scene) {
             if (!player || !player.active) return;
             
@@ -1508,6 +2021,134 @@ function updateConnectionStatus(status, text) {
             });
             
             armyText.setText(`Army: ${allies.children.entries.length + 1}`);
+        }
+        
+        function spawnPowerup(scene) {
+            const types = ['speed', 'damage', 'heal'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            const powerup = powerups.create(
+                Math.random() * WORLD_WIDTH,
+                Math.random() * WORLD_HEIGHT,
+                `powerup-${type}`
+            );
+            
+            powerup.setData('type', type);
+            
+            // Float animation
+            scene.tweens.add({
+                targets: powerup,
+                y: powerup.y - 10,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1
+            });
+        }
+        
+        function collectPowerup(scene, powerup) {
+            const type = powerup.getData('type');
+            
+            const text = scene.add.text(powerup.x, powerup.y - 20, '', {
+                fontSize: '20px',
+                color: '#ffd700',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            
+            if (type === 'speed') {
+                text.setText('⚡ SPEED!');
+                const old = heroStats.speed;
+                heroStats.speed *= 1.5;
+                scene.time.delayedCall(8000, () => { heroStats.speed = old; });
+            } else if (type === 'damage') {
+                text.setText('💪 DAMAGE!');
+                const old = heroStats.damage;
+                heroStats.damage *= 2;
+                player.setData('damage', heroStats.damage);
+                scene.time.delayedCall(8000, () => { 
+                    heroStats.damage = old;
+                    player.setData('damage', old);
+                });
+            } else {
+                text.setText('❤️ HEAL!');
+                heroStats.hp = heroStats.maxHp;
+                player.setData('hp', heroStats.hp);
+            }
+            
+            scene.tweens.add({
+                targets: text,
+                y: text.y - 40,
+                alpha: 0,
+                duration: 1500,
+                onComplete: () => text.destroy()
+            });
+            
+            powerup.destroy();
+            updateHeroHUD();
+        }
+        
+        function spawnBoss(scene) {
+            const boss = bosses.create(
+                Math.random() * WORLD_WIDTH,
+                Math.random() * WORLD_HEIGHT,
+                'boss'
+            );
+            
+            boss.setData('hp', 200);
+            boss.setData('maxHp', 200);
+            boss.setData('damage', 30);
+            boss.setData('attackRange', 100);
+            boss.setData('attackSpeed', 800);
+            boss.setData('lastAttack', 0);
+            boss.setData('team', 'boss');
+            boss.setData('isBoss', true);
+        }
+        
+        function damageBoss(scene, boss, damage) {
+            if (!boss || !boss.active) return;
+            
+            const hp = boss.getData('hp') - damage;
+            boss.setData('hp', hp);
+            
+            boss.setTint(0xffffff);
+            scene.time.delayedCall(80, () => {
+                if (boss && boss.active) boss.clearTint();
+            });
+            
+            if (hp <= 0) {
+                // Boss died
+                for (let i = 0; i < 12; i++) {
+                    const particle = scene.add.circle(boss.x, boss.y, 5, 0xff0000);
+                    const angle = (Math.PI * 2 * i) / 12;
+                    scene.tweens.add({
+                        targets: particle,
+                        x: boss.x + Math.cos(angle) * 60,
+                        y: boss.y + Math.sin(angle) * 60,
+                        alpha: 0,
+                        duration: 500,
+                        onComplete: () => particle.destroy()
+                    });
+                }
+                
+                gainXP(100);
+                kills += 5;
+                killText.setText(`Kills: ${kills}`);
+                
+                const text = scene.add.text(boss.x, boss.y, 'BOSS DEFEATED!', {
+                    fontSize: '32px',
+                    color: '#ff0000',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
+                
+                scene.tweens.add({
+                    targets: text,
+                    y: text.y - 80,
+                    alpha: 0,
+                    duration: 2000,
+                    onComplete: () => text.destroy()
+                });
+                
+                boss.destroy();
+            }
         }
     </script>
 </body>
