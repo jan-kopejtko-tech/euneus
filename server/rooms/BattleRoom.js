@@ -105,6 +105,10 @@ class BattleRoom extends Room {
     if (!player) return;
     
     switch(type) {
+      case "input":
+        // Do nothing - client sends input but we don't use it yet
+        break;
+        
       case "move":
         // Update player position and angle
         player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.x));
