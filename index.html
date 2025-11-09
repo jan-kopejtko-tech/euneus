@@ -233,6 +233,7 @@ let otherPlayers = {}; // Map of sessionId -> sprite
 let otherPlayerAllies = {}; // Map of sessionId -> array of ally sprites
 let serverMobs = {}; // Map of mobId -> sprite
 let gameScene; // Reference to Phaser scene
+let game; // Phaser game instance
 
 // Hero class system
 let selectedClass = null;
@@ -373,9 +374,14 @@ function gainXP(amount) {
 }
 
 function startGame() {
+    console.log('🎮 Starting game...');
+    
+    // Show game container
+    document.getElementById('game-container').style.display = 'block';
+    
     // Start Phaser game
-    const game = new Phaser.Game(config);
-    connectToMultiplayer();
+    game = new Phaser.Game(config);
+    console.log('✅ Phaser game created');
 }
 
 async function connectToMultiplayer() {
