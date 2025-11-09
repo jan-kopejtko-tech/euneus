@@ -10,14 +10,14 @@
     
     <!-- Game Systems -->
     <script src="game-config.js"></script>
-    <script src="SaveSystem.js"></script>
-    <script src="GameData.js"></script>
+    <script src="savesystem.js"></script>
+    <script src="gamedata.js"></script>
     
     <!-- Game Scenes -->
-    <script src="MenuScene.js"></script>
-    <script src="ClassSelectScene.js"></script>
-    <script src="CastleScene.js"></script>
-    <script src="BattleScene.js"></script>
+    <script src="menuscene.js"></script>
+    <script src="classselectscene.js"></script>
+    <script src="castlescene.js"></script>
+    <script src="battlescene.js"></script>
     
     <style>
         body {
@@ -218,19 +218,19 @@
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-row">
-                    <span id="damage-label">⚔️ Damage</span>
+                    <span id="damage-label">âš”ï¸ Damage</span>
                     <span id="stat-damage">20</span>
                 </div>
                 <div class="stat-row">
-                    <span id="speed-label">🏃 Speed</span>
+                    <span id="speed-label">ðŸƒ Speed</span>
                     <span id="stat-speed">220</span>
                 </div>
                 <div class="stat-row">
-                    <span id="range-label">🎯 Range</span>
+                    <span id="range-label">ðŸŽ¯ Range</span>
                     <span id="stat-range">80</span>
                 </div>
                 <div class="stat-row">
-                    <span id="army-label">👥 Army</span>
+                    <span id="army-label">ðŸ‘¥ Army</span>
                     <span id="stat-army">1</span>
                 </div>
             </div>
@@ -240,12 +240,12 @@
         <div id="abilities-bar">
             <div class="abilities-container">
                 <div class="ability" data-key="Q">
-                    <div class="ability-icon ability-icon-dash">💨</div>
+                    <div class="ability-icon ability-icon-dash">ðŸ’¨</div>
                     <div class="ability-key">Q</div>
                     <div class="ability-cooldown"></div>
                 </div>
                 <div class="ability" data-key="E">
-                    <div class="ability-icon ability-icon-aoe">💥</div>
+                    <div class="ability-icon ability-icon-aoe">ðŸ’¥</div>
                     <div class="ability-key">E</div>
                     <div class="ability-cooldown"></div>
                 </div>
@@ -282,8 +282,8 @@
         // Start the game
         const game = new Phaser.Game(config);
         
-        console.log('🎮 Kingdom of Euneus - Game Started');
-        console.log('📦 Version: 1.0.0');
+        console.log('ðŸŽ® Kingdom of Euneus - Game Started');
+        console.log('ðŸ“¦ Version: 1.0.0');
     </script>
 </body>
 </html>
