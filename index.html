@@ -910,17 +910,6 @@ function updateConnectionStatus(status, text) {
             this.retryButton = retryButton;
             this.retryBg = retryBg;
             
-            // Spawn mobs over time
-            this.time.addEvent({
-                delay: 3000,
-                callback: () => {
-                    for (let i = 0; i < 5; i++) {
-                        spawnMob(this);
-                    }
-                },
-                loop: true
-            });
-            
             // Spawn power-ups periodically
             this.time.addEvent({
                 delay: 10000,
@@ -1457,18 +1446,6 @@ function updateConnectionStatus(status, text) {
                 
                 autoAttack(game.scene.scenes[0], archer, time);
             });
-        }
-
-        function spawnMob(scene) {
-            const x = Phaser.Math.Between(100, WORLD_WIDTH - 100);
-            const y = Phaser.Math.Between(100, WORLD_HEIGHT - 100);
-            
-            const mob = mobs.create(x, y, 'mob');
-            mob.setData('hp', 30);
-            mob.setData('maxHp', 30);
-            mob.setData('lastMove', 0);
-            
-            setRandomTarget(mob);
         }
 
         function setRandomTarget(mob) {
