@@ -1,26 +1,79 @@
 const { Room } = require("@colyseus/core");
+const { Schema, MapSchema, type } = require("@colyseus/schema");
+
+// Define Player schema
+class Player extends Schema {
+  constructor(x, y) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.angle = 0;
+    this.hp = 100;
+    this.maxHp = 100;
+    this.kills = 0;
+  }
+}
+
+// Define type decorators for Player
+type("number")(Player.prototype, "x");
+type("number")(Player.prototype, "y");
+type("number")(Player.prototype, "angle");
+type("number")(Player.prototype, "hp");
+type("number")(Player.prototype, "maxHp");
+type("number")(Player.prototype, "kills");
+
+// Define Mob schema
+class Mob extends Schema {
+  constructor(x, y) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.hp = 30;
+    this.maxHp = 30;
+    this.targetX = x;
+    this.targetY = y;
+  }
+}
+
+// Define type decorators for Mob
+type("number")(Mob.prototype, "x");
+type("number")(Mob.prototype, "y");
+type("number")(Mob.prototype, "hp");
+type("number")(Mob.prototype, "maxHp");
+type("number")(Mob.prototype, "targetX");
+type("number")(Mob.prototype, "targetY");
+
+// Define game state schema
+class GameState extends Schema {
+  constructor() {
+    super();
+    this.players = new MapSchema();
+    this.mobs = new MapSchema();
+    this.tick = 0;
+  }
+}
+
+// Define type decorators for GameState
+type({ map: Player })(GameState.prototype, "players");
+type({ map: Mob })(GameState.prototype, "mobs");
+type("number")(GameState.prototype, "tick");
 
 class BattleRoom extends Room {
   onCreate(options) {
     console.log("🎮 Battle Room Created!");
     
-    // Initialize game state
-    this.state = {
-      players: {},
-      mobs: {},
-      tick: 0
-    };
+    // Initialize game state with Schema
+    this.setState(new GameState());
     
     // World constants
     this.WORLD_WIDTH = 4000;
     this.WORLD_HEIGHT = 3000;
-    this.PLAYER_SPEED = 220; // Pixels per second
     
     // Spawn initial mobs
     this.spawnMobs(80);
     
-    // Game loop - 60 updates per second (like agar.io)
-    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / 60);
+    // Game loop - 20 updates per second
+    this.setSimulationInterval((deltaTime) => this.update(deltaTime), 50);
     
     // Spawn more mobs periodically
     this.mobSpawnTimer = this.clock.setInterval(() => {
@@ -31,24 +84,13 @@ class BattleRoom extends Room {
   onJoin(client, options) {
     console.log(`✅ Player ${client.sessionId} joined`);
     
-    // Create new player
-    const player = {
-      id: client.sessionId,
-      x: this.WORLD_WIDTH / 2 + (Math.random() - 0.5) * 500,
-      y: this.WORLD_HEIGHT / 2 + (Math.random() - 0.5) * 500,
-      angle: 0,
-      hp: 100,
-      maxHp: 100,
-      kills: 0,
-      army: [],
-      // Input-based movement (like agar.io)
-      targetX: this.WORLD_WIDTH / 2,
-      targetY: this.WORLD_HEIGHT / 2,
-      velocityX: 0,
-      velocityY: 0
-    };
+    // Create new player with Schema
+    const player = new Player(
+      this.WORLD_WIDTH / 2 + (Math.random() - 0.5) * 500,
+      this.WORLD_HEIGHT / 2 + (Math.random() - 0.5) * 500
+    );
     
-    this.state.players[client.sessionId] = player;
+    this.state.players.set(client.sessionId, player);
     
     // Send initial state to client
     client.send("init", {
@@ -59,21 +101,12 @@ class BattleRoom extends Room {
   }
   
   onMessage(client, type, message) {
-    const player = this.state.players[client.sessionId];
+    const player = this.state.players.get(client.sessionId);
     if (!player) return;
     
     switch(type) {
-      case "input":
-        // ⭐ INPUT-BASED (like agar.io)
-        // Client sends where their mouse is pointing
-        // Server calculates movement
-        player.targetX = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.targetX));
-        player.targetY = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, message.targetY));
-        break;
-        
       case "move":
-        // ❌ OLD POSITION-BASED (keeping for backwards compatibility)
-        // Will be removed once client is updated
+        // Update player position and angle
         player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.x));
         player.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, message.y));
         player.angle = message.angle;
@@ -83,25 +116,12 @@ class BattleRoom extends Room {
         // Client is attacking - server validates and calculates damage
         this.handleAttack(client.sessionId, message.targetId, message.targetType);
         break;
-        
-      case "spawn_ally":
-        // Player killed a mob and wants to spawn an ally
-        if (player.kills >= message.killThreshold) {
-          const ally = {
-            type: message.type, // 'knight' or 'archer'
-            hp: message.type === 'knight' ? 10 : 5,
-            maxHp: message.type === 'knight' ? 10 : 5,
-            damage: message.type === 'knight' ? 5 : 2.5
-          };
-          player.army.push(ally);
-        }
-        break;
     }
   }
   
   onLeave(client, consented) {
     console.log(`❌ Player ${client.sessionId} left`);
-    delete this.state.players[client.sessionId];
+    this.state.players.delete(client.sessionId);
   }
   
   onDispose() {
@@ -109,49 +129,12 @@ class BattleRoom extends Room {
     this.mobSpawnTimer.clear();
   }
   
-  // Game loop - 60Hz like agar.io
+  // Game loop
   update(deltaTime) {
     this.state.tick++;
     
-    const deltaSeconds = deltaTime / 1000;
-    
-    // ⭐ UPDATE PLAYER POSITIONS BASED ON INPUT (server-authoritative)
-    for (let sessionId in this.state.players) {
-      const player = this.state.players[sessionId];
-      
-      // Calculate direction to target (mouse position)
-      const dx = player.targetX - player.x;
-      const dy = player.targetY - player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Move toward target if far enough
-      if (distance > 20) {
-        // Calculate angle
-        player.angle = Math.atan2(dy, dx);
-        
-        // Calculate velocity
-        const speed = this.PLAYER_SPEED * deltaSeconds;
-        player.velocityX = (dx / distance) * speed;
-        player.velocityY = (dy / distance) * speed;
-        
-        // Update position
-        player.x += player.velocityX;
-        player.y += player.velocityY;
-        
-        // Keep in bounds
-        player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, player.x));
-        player.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, player.y));
-      } else {
-        // Stop if close to target
-        player.velocityX = 0;
-        player.velocityY = 0;
-      }
-    }
-    
     // Update mobs AI (simple random movement)
-    for (let mobId in this.state.mobs) {
-      const mob = this.state.mobs[mobId];
-      
+    this.state.mobs.forEach((mob, mobId) => {
       // Simple random walk
       if (!mob.targetX || Math.random() < 0.01) {
         mob.targetX = Math.random() * this.WORLD_WIDTH;
@@ -164,7 +147,7 @@ class BattleRoom extends Room {
       const dist = Math.sqrt(dx * dx + dy * dy);
       
       if (dist > 5) {
-        const speed = 50 * deltaSeconds;
+        const speed = 50 * (deltaTime / 1000);
         mob.x += (dx / dist) * speed;
         mob.y += (dy / dist) * speed;
       }
@@ -172,33 +155,29 @@ class BattleRoom extends Room {
       // Keep in bounds
       mob.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, mob.x));
       mob.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, mob.y));
-    }
+    });
   }
   
   spawnMobs(count) {
     for (let i = 0; i < count; i++) {
       const mobId = `mob_${Date.now()}_${Math.random()}`;
-      this.state.mobs[mobId] = {
-        id: mobId,
-        x: Math.random() * this.WORLD_WIDTH,
-        y: Math.random() * this.WORLD_HEIGHT,
-        hp: 30,
-        maxHp: 30,
-        targetX: Math.random() * this.WORLD_WIDTH,
-        targetY: Math.random() * this.WORLD_HEIGHT
-      };
+      const mob = new Mob(
+        Math.random() * this.WORLD_WIDTH,
+        Math.random() * this.WORLD_HEIGHT
+      );
+      this.state.mobs.set(mobId, mob);
     }
   }
   
   handleAttack(attackerId, targetId, targetType) {
-    const attacker = this.state.players[attackerId];
+    const attacker = this.state.players.get(attackerId);
     if (!attacker) return;
     
     let damage = 20; // Hero base damage
     let target = null;
     
     if (targetType === 'mob') {
-      target = this.state.mobs[targetId];
+      target = this.state.mobs.get(targetId);
       if (!target) return;
       
       target.hp -= damage;
@@ -213,7 +192,7 @@ class BattleRoom extends Room {
       
       // Mob died
       if (target.hp <= 0) {
-        delete this.state.mobs[targetId];
+        this.state.mobs.delete(targetId);
         attacker.kills++;
         
         this.broadcast("mob_killed", {
@@ -224,7 +203,7 @@ class BattleRoom extends Room {
       }
     } 
     else if (targetType === 'player') {
-      target = this.state.players[targetId];
+      target = this.state.players.get(targetId);
       if (!target) return;
       
       target.hp -= damage;
@@ -242,33 +221,6 @@ class BattleRoom extends Room {
           playerId: targetId,
           killerId: attackerId
         });
-      }
-    }
-    else if (targetType === 'unit') {
-      // Attacking another player's army unit
-      const [targetPlayerId, unitIndex] = targetId.split('_');
-      const targetPlayer = this.state.players[targetPlayerId];
-      
-      if (targetPlayer && targetPlayer.army[unitIndex]) {
-        const unit = targetPlayer.army[unitIndex];
-        unit.hp -= damage;
-        
-        this.broadcast("damage", {
-          targetId: targetId,
-          targetType: 'unit',
-          damage: damage,
-          newHp: unit.hp
-        });
-        
-        // Unit died
-        if (unit.hp <= 0) {
-          targetPlayer.army.splice(unitIndex, 1);
-          
-          this.broadcast("unit_killed", {
-            unitId: targetId,
-            killerId: attackerId
-          });
-        }
       }
     }
   }
