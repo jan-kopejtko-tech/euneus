@@ -11,6 +11,7 @@ class Player extends Schema {
     this.hp = 100;
     this.maxHp = 100;
     this.kills = 0;
+    this.allyData = [];
   }
 }
 
@@ -21,6 +22,7 @@ type("number")(Player.prototype, "angle");
 type("number")(Player.prototype, "hp");
 type("number")(Player.prototype, "maxHp");
 type("number")(Player.prototype, "kills");
+type(["number"])(Player.prototype, "allyData"); // Flat array: [x1,y1,a1, x2,y2,a2, ...]
 
 // Define Mob schema
 class Mob extends Schema {
@@ -91,6 +93,21 @@ class BattleRoom extends Room {
     
     this.onMessage("input", (client, message) => {
       // Reserved for future use
+    });
+    
+    this.onMessage("update_allies", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      
+      // Flatten ally array: [x1,y1,a1, x2,y2,a2, ...]
+      const flat = [];
+      if (message.allies && Array.isArray(message.allies)) {
+        message.allies.forEach(ally => {
+          flat.push(ally.x, ally.y, ally.angle);
+        });
+      }
+      
+      player.allyData = flat;
     });
     
     // Game loop - 20 updates per second

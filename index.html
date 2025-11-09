@@ -101,6 +101,8 @@ let client = new Colyseus.Client(SERVER_URL);
 let room;
 let myPlayerId;
 let otherPlayers = {}; // Map of sessionId -> sprite
+let otherPlayerAllies = {}; // Map of sessionId -> array of ally sprites
+let serverMobs = {}; // Map of mobId -> sprite
 let gameScene; // Reference to Phaser scene
 
 async function connectToMultiplayer() {
@@ -164,6 +166,48 @@ async function connectToMultiplayer() {
                         sprite.setData('hp', serverPlayer.hp);
                     }
                 }
+                
+                // Render other player's allies
+                if (serverPlayer.allyData && serverPlayer.allyData.length > 0) {
+                    if (!otherPlayerAllies[sessionId]) {
+                        otherPlayerAllies[sessionId] = [];
+                    }
+                    
+                    const allySprites = otherPlayerAllies[sessionId];
+                    const allyCount = Math.floor(serverPlayer.allyData.length / 3);
+                    
+                    // Create/update ally sprites
+                    for (let i = 0; i < allyCount; i++) {
+                        const x = serverPlayer.allyData[i * 3];
+                        const y = serverPlayer.allyData[i * 3 + 1];
+                        const angle = serverPlayer.allyData[i * 3 + 2];
+                        
+                        if (!allySprites[i]) {
+                            // Create new ally sprite
+                            const allySprite = gameScene.physics.add.sprite(x, y, 'knight');
+                            allySprite.setTint(0xff4444); // Red tint
+                            allySprite.setData('team', 'red');
+                            allySprites[i] = allySprite;
+                        } else {
+                            // Update existing ally with interpolation
+                            const allySprite = allySprites[i];
+                            if (allySprite && allySprite.active) {
+                                const newX = Phaser.Math.Linear(allySprite.x, x, 0.3);
+                                const newY = Phaser.Math.Linear(allySprite.y, y, 0.3);
+                                allySprite.setPosition(newX, newY);
+                                allySprite.setRotation(angle);
+                            }
+                        }
+                    }
+                    
+                    // Remove excess ally sprites
+                    for (let i = allyCount; i < allySprites.length; i++) {
+                        if (allySprites[i]) {
+                            allySprites[i].destroy();
+                        }
+                    }
+                    allySprites.length = allyCount;
+                }
             });
             
             // Remove disconnected players
@@ -174,6 +218,51 @@ async function connectToMultiplayer() {
                         otherPlayers[sessionId].destroy();
                     }
                     delete otherPlayers[sessionId];
+                    
+                    // Remove their allies
+                    if (otherPlayerAllies[sessionId]) {
+                        otherPlayerAllies[sessionId].forEach(ally => {
+                            if (ally) ally.destroy();
+                        });
+                        delete otherPlayerAllies[sessionId];
+                    }
+                }
+            }
+            
+            // Sync mobs from server
+            state.mobs.forEach((serverMob, mobId) => {
+                if (!serverMobs[mobId]) {
+                    // Create new mob sprite
+                    const mobSprite = gameScene.physics.add.sprite(
+                        serverMob.x,
+                        serverMob.y,
+                        'mob'
+                    );
+                    mobSprite.setData('hp', serverMob.hp);
+                    mobSprite.setData('maxHp', serverMob.maxHp);
+                    mobSprite.setData('team', 'mob');
+                    mobSprite.setData('isMob', true);
+                    serverMobs[mobId] = mobSprite;
+                    mobs.add(mobSprite);
+                } else {
+                    // Update existing mob
+                    const mobSprite = serverMobs[mobId];
+                    if (mobSprite && mobSprite.active) {
+                        const newX = Phaser.Math.Linear(mobSprite.x, serverMob.x, 0.2);
+                        const newY = Phaser.Math.Linear(mobSprite.y, serverMob.y, 0.2);
+                        mobSprite.setPosition(newX, newY);
+                        mobSprite.setData('hp', serverMob.hp);
+                    }
+                }
+            });
+            
+            // Remove killed mobs
+            for (let mobId in serverMobs) {
+                if (!state.mobs[mobId]) {
+                    if (serverMobs[mobId]) {
+                        serverMobs[mobId].destroy();
+                    }
+                    delete serverMobs[mobId];
                 }
             }
         });
@@ -312,10 +401,7 @@ function updateConnectionStatus(status, text) {
             enemyAllies = this.physics.add.group(); // Enemy army (now from multiplayer)
             mobs = this.physics.add.group();
             
-            // Spawn initial mobs across the larger world
-            for (let i = 0; i < 80; i++) {
-                spawnMob(this);
-            }
+            // Mobs will be synced from server
             
             // Input
             pointer = this.input.activePointer;
@@ -497,6 +583,20 @@ function updateConnectionStatus(status, text) {
                             x: player.x,
                             y: player.y,
                             angle: angle
+                        });
+                        
+                        // 📡 SEND ALLY POSITIONS (batched in single message)
+                        const allyPositions = allies.children.entries
+                            .filter(ally => ally && ally.active)
+                            .slice(0, 100) // Cap at 100 allies
+                            .map(ally => ({
+                                x: ally.x,
+                                y: ally.y,
+                                angle: ally.rotation
+                            }));
+                        
+                        room.send("update_allies", {
+                            allies: allyPositions
                         });
                     }
                 } else {
