@@ -72,6 +72,27 @@ class BattleRoom extends Room {
     // Spawn initial mobs
     this.spawnMobs(80);
     
+    // ✅ REGISTER MESSAGE HANDLERS (Colyseus 0.15 style)
+    this.onMessage("move", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      
+      // Update player position and angle with bounds checking
+      player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.x));
+      player.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, message.y));
+      player.angle = message.angle;
+      
+      console.log(`📍 Player ${client.sessionId} moved to ${Math.round(player.x)}, ${Math.round(player.y)}`);
+    });
+    
+    this.onMessage("attack", (client, message) => {
+      this.handleAttack(client.sessionId, message.targetId, message.targetType);
+    });
+    
+    this.onMessage("input", (client, message) => {
+      // Reserved for future use
+    });
+    
     // Game loop - 20 updates per second
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 50);
     
@@ -98,29 +119,6 @@ class BattleRoom extends Room {
       worldWidth: this.WORLD_WIDTH,
       worldHeight: this.WORLD_HEIGHT
     });
-  }
-  
-  onMessage(client, type, message) {
-    const player = this.state.players.get(client.sessionId);
-    if (!player) return;
-    
-    switch(type) {
-      case "input":
-        // Do nothing - client sends input but we don't use it yet
-        break;
-        
-      case "move":
-        // Update player position and angle
-        player.x = Math.max(30, Math.min(this.WORLD_WIDTH - 30, message.x));
-        player.y = Math.max(30, Math.min(this.WORLD_HEIGHT - 30, message.y));
-        player.angle = message.angle;
-        break;
-        
-      case "attack":
-        // Client is attacking - server validates and calculates damage
-        this.handleAttack(client.sessionId, message.targetId, message.targetType);
-        break;
-    }
   }
   
   onLeave(client, consented) {
