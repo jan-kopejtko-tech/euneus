@@ -12,6 +12,7 @@ class Player extends Schema {
     this.maxHp = 100;
     this.kills = 0;
     this.allyData = [];
+    this.allyCount = 0; // Track number of allies
   }
 }
 
@@ -23,6 +24,7 @@ type("number")(Player.prototype, "hp");
 type("number")(Player.prototype, "maxHp");
 type("number")(Player.prototype, "kills");
 type(["number"])(Player.prototype, "allyData"); // Flat array: [x1,y1,a1, x2,y2,a2, ...]
+type("number")(Player.prototype, "allyCount");
 
 // Define Mob schema
 class Mob extends Schema {
@@ -88,7 +90,7 @@ class BattleRoom extends Room {
     });
     
     this.onMessage("attack", (client, message) => {
-      this.handleAttack(client.sessionId, message.targetId, message.targetType);
+      this.handleAttack(client.sessionId, message.targetId, message.targetType, message.allyIndex);
     });
     
     this.onMessage("input", (client, message) => {
@@ -108,6 +110,7 @@ class BattleRoom extends Room {
       }
       
       player.allyData = flat;
+      player.allyCount = message.allies ? message.allies.length : 0;
     });
     
     // Game loop - 20 updates per second
@@ -188,7 +191,7 @@ class BattleRoom extends Room {
     }
   }
   
-  handleAttack(attackerId, targetId, targetType) {
+  handleAttack(attackerId, targetId, targetType, allyIndex) {
     const attacker = this.state.players.get(attackerId);
     if (!attacker) return;
     
@@ -258,6 +261,23 @@ class BattleRoom extends Room {
             });
           }
         }, 3000);
+      }
+    }
+    else if (targetType === 'ally') {
+      // Attacking another player's ally
+      const targetPlayer = this.state.players.get(targetId);
+      if (!targetPlayer) return;
+      if (allyIndex === undefined || allyIndex < 0 || allyIndex >= targetPlayer.allyCount) return;
+      
+      // Decrement ally count (simple approach - owner will remove from their array)
+      if (targetPlayer.allyCount > 0) {
+        targetPlayer.allyCount--;
+        
+        this.broadcast("ally_killed", {
+          ownerId: targetId,
+          allyIndex: allyIndex,
+          killerId: attackerId
+        });
       }
     }
   }

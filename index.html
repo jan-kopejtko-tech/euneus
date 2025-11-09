@@ -342,6 +342,50 @@ async function connectToMultiplayer() {
             }
         });
         
+        // Handle ally killed
+        room.onMessage("ally_killed", (message) => {
+            console.log("⚔️ Ally killed:", message);
+            
+            if (message.ownerId === myPlayerId) {
+                // One of OUR allies was killed - remove from our array
+                if (message.allyIndex < allies.children.entries.length) {
+                    const ally = allies.children.entries[message.allyIndex];
+                    if (ally && ally.active) {
+                        // Death effect
+                        for (let i = 0; i < 5; i++) {
+                            const particle = gameScene.add.circle(
+                                ally.x, ally.y,
+                                2 + Math.random() * 2,
+                                0xff4444
+                            );
+                            const angle = (Math.PI * 2 * i) / 5;
+                            gameScene.tweens.add({
+                                targets: particle,
+                                x: ally.x + Math.cos(angle) * 30,
+                                y: ally.y + Math.sin(angle) * 30,
+                                alpha: 0,
+                                duration: 300,
+                                onComplete: () => particle.destroy()
+                            });
+                        }
+                        
+                        ally.destroy();
+                    }
+                    
+                    armyText.setText(`Army: ${allies.children.entries.length + 1}`);
+                }
+            } else {
+                // Someone else's ally was killed - already handled visually by attacker
+                // Just make sure we clean up if we have them rendered
+                if (otherPlayerAllies[message.ownerId] && otherPlayerAllies[message.ownerId][message.allyIndex]) {
+                    const ally = otherPlayerAllies[message.ownerId][message.allyIndex];
+                    if (ally && ally.active) {
+                        ally.destroy();
+                    }
+                }
+            }
+        });
+        
         // Handle disconnect
         room.onLeave((code) => {
             console.log("⚠️ Left room with code:", code);
@@ -1233,6 +1277,31 @@ function updateConnectionStatus(status, text) {
                     room.send("attack", {
                         targetId: targetPlayerId,
                         targetType: 'player'
+                    });
+                }
+            }
+            
+            // If attacking another player's ally
+            if (unitType === 'unit' && unit.getData('team') === 'red') {
+                let targetPlayerId = null;
+                let allyIndex = -1;
+                
+                // Find which player this ally belongs to
+                for (let sessionId in otherPlayerAllies) {
+                    const allies = otherPlayerAllies[sessionId];
+                    const index = allies.indexOf(unit);
+                    if (index !== -1) {
+                        targetPlayerId = sessionId;
+                        allyIndex = index;
+                        break;
+                    }
+                }
+                
+                if (targetPlayerId && allyIndex !== -1 && room) {
+                    room.send("attack", {
+                        targetId: targetPlayerId,
+                        targetType: 'ally',
+                        allyIndex: allyIndex
                     });
                 }
             }
