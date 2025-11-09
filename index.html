@@ -509,41 +509,30 @@ function updateConnectionStatus(status, text) {
             // Input
             pointer = this.input.activePointer;
             
-            // UI - Fixed to camera using camera bounds for proper positioning
-            const cam = this.cameras.main;
-            
-            killText = this.add.text(cam.scrollX + 20, cam.scrollY + 20, 'Kills: 0', {
+            // UI - Fixed to screen with setScrollFactor(0)
+            killText = this.add.text(20, 20, 'Kills: 0', {
                 fontSize: '32px',
                 color: '#ffffff',
                 fontStyle: 'bold',
                 stroke: '#000000',
                 strokeThickness: 5
-            }).setDepth(2000);
+            }).setScrollFactor(0, 0).setDepth(2000).setOrigin(0, 0);
             
-            armyText = this.add.text(cam.scrollX + 20, cam.scrollY + 60, 'Army: 1', {
+            armyText = this.add.text(20, 65, 'Army: 1', {
                 fontSize: '28px',
                 color: '#ffaa00',
                 fontStyle: 'bold',
                 stroke: '#000000',
                 strokeThickness: 4
-            }).setDepth(2000);
+            }).setScrollFactor(0, 0).setDepth(2000).setOrigin(0, 0);
             
-            playerCountText = this.add.text(cam.scrollX + 20, cam.scrollY + 100, 'Players: 1', {
+            playerCountText = this.add.text(20, 105, 'Players: 1', {
                 fontSize: '24px',
                 color: '#00ffff',
                 fontStyle: 'bold',
                 stroke: '#000000',
                 strokeThickness: 4
-            }).setDepth(2000);
-            
-            // Update stats position every frame to follow camera
-            this.events.on('prerender', () => {
-                if (killText) {
-                    killText.setPosition(cam.scrollX + 20, cam.scrollY + 20);
-                    armyText.setPosition(cam.scrollX + 20, cam.scrollY + 60);
-                    playerCountText.setPosition(cam.scrollX + 20, cam.scrollY + 100);
-                }
-            });
+            }).setScrollFactor(0, 0).setDepth(2000).setOrigin(0, 0);
             
             // Legend with actual emojis
             this.add.text(600, 15, '🛡️ You  •  ⚔️ Knights  •  🏹 Archers  •  👹 Goblins', {
