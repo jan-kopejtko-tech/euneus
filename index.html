@@ -151,6 +151,11 @@ async function connectToMultiplayer() {
                     sprite.setData('maxHp', serverPlayer.maxHp);
                     sprite.setData('team', 'red');
                     sprite.setData('isOtherPlayer', true);
+                    // Add attack stats so they can fight
+                    sprite.setData('damage', 20);
+                    sprite.setData('attackRange', 80);
+                    sprite.setData('attackSpeed', 500);
+                    sprite.setData('lastAttack', 0);
                     otherPlayers[sessionId] = sprite;
                 } else {
                     // Update existing player with SMOOTH INTERPOLATION (like agar.io)
@@ -192,6 +197,11 @@ async function connectToMultiplayer() {
                             allySprite.setData('isArcher', isArcher);
                             allySprite.setData('hp', isArcher ? 5 : 10);
                             allySprite.setData('maxHp', isArcher ? 5 : 10);
+                            // Add attack stats so they can fight back
+                            allySprite.setData('damage', isArcher ? 2.5 : 5);
+                            allySprite.setData('attackRange', isArcher ? 160 : 75);
+                            allySprite.setData('attackSpeed', isArcher ? 850 : 550);
+                            allySprite.setData('lastAttack', 0);
                             allySprites[i] = allySprite;
                         } else {
                             // Update existing ally with interpolation
@@ -713,6 +723,23 @@ function updateConnectionStatus(status, text) {
             game.scene.scenes[0].cameras.main.setZoom(newZoom);
             
             // Update other players (they will be moved by server state)
+            // Make other players attack
+            for (let sessionId in otherPlayers) {
+                const otherPlayer = otherPlayers[sessionId];
+                if (otherPlayer && otherPlayer.active) {
+                    autoAttack(game.scene.scenes[0], otherPlayer, time);
+                }
+            }
+            
+            // Update other players' allies - make them attack
+            for (let sessionId in otherPlayerAllies) {
+                const enemyAllies = otherPlayerAllies[sessionId];
+                enemyAllies.forEach(ally => {
+                    if (ally && ally.active) {
+                        autoAttack(game.scene.scenes[0], ally, time);
+                    }
+                });
+            }
             
             // RENDER HEALTH BARS for all units with HP
             renderHealthBars(game.scene.scenes[0]);
@@ -1389,6 +1416,12 @@ function updateConnectionStatus(status, text) {
             }
             
             if (!mobId || !room) return;
+            
+            // Throttle attacks per mob to prevent spam (100ms cooldown per mob)
+            const now = Date.now();
+            if (!mob.lastAttackSent) mob.lastAttackSent = 0;
+            if (now - mob.lastAttackSent < 100) return;
+            mob.lastAttackSent = now;
             
             // Send attack to server instead of applying damage locally
             room.send("attack", {
