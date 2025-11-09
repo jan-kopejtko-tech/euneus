@@ -4,8 +4,346 @@ class BattleScene extends Phaser.Scene {
         super({ key: 'BattleScene' });
     }
     
+    preload() {
+        // Load Tiny Swords sprite sheets
+        const basePath = 'assets';
+        
+        // Player sprites (based on class)
+        const heroClass = gameData.data.hero.class;
+        const classSprites = {
+            'tank': `${basePath}/Factions/Knights/Troops/Warrior/Blue/Warrior_Blue.png`,
+            'assassin': `${basePath}/Factions/Knights/Troops/Pawn/Red/Pawn_Red.png`,
+            'mage': `${basePath}/Factions/Knights/Troops/Warrior/Purple/Warrior_Purple.png`
+        };
+        
+        // Load as sprite sheets (each frame is 192x192 in a grid)
+        this.load.spritesheet('player', classSprites[heroClass], { frameWidth: 192, frameHeight: 192 });
+        
+        // Allied units
+        this.load.spritesheet('knight', `${basePath}/Factions/Knights/Troops/Warrior/Red/Warrior_Red.png`, { frameWidth: 192, frameHeight: 192 });
+        this.load.spritesheet('archer', `${basePath}/Factions/Knights/Troops/Archer/Red/Archer_Red.png`, { frameWidth: 192, frameHeight: 192 });
+        
+        // Enemies - using Goblins faction
+        this.load.spritesheet('goblin', `${basePath}/Factions/Goblins/Troops/Torch/Red/Torch_Red.png`, { frameWidth: 192, frameHeight: 192 });
+        this.load.spritesheet('orc', `${basePath}/Factions/Goblins/Troops/TNT/Red/TNT_Red.png`, { frameWidth: 192, frameHeight: 192 });
+        this.load.spritesheet('troll', `${basePath}/Factions/Goblins/Troops/Barrel/Red/Barrel_Red.png`, { frameWidth: 192, frameHeight: 192 });
+        this.load.spritesheet('dragon', `${basePath}/Factions/Goblins/Troops/Torch/Purple/Torch_Purple.png`, { frameWidth: 192, frameHeight: 192 });
+        
+        // Powerups (these might be single images)
+        this.load.image('powerup-speed', `${basePath}/UI/Icons/Regular_01.png`);
+        this.load.image('powerup-damage', `${basePath}/UI/Icons/Regular_02.png`);
+        this.load.image('powerup-heal', `${basePath}/UI/Icons/Regular_03.png`);
+    }
+    
+    createAnimations() {
+        console.log('🎨 Creating sprite animations...');
+        
+        const spriteTypes = ['player', 'knight', 'archer', 'goblin', 'orc', 'troll', 'dragon'];
+        
+        spriteTypes.forEach(type => {
+            if (this.anims.exists(`${type}_idle`)) return;
+            
+            // Get actual frame count for this sprite
+            const texture = this.textures.get(type);
+            if (!texture) {
+                console.warn(`Texture ${type} not found`);
+                return;
+            }
+            
+            const frameCount = texture.frameTotal - 1; // -1 because frames are 0-indexed
+            
+            // Determine frame ranges based on available frames
+            let maxIdleFrame, maxWalkFrame, maxAttackFrame, walkStartFrame, attackStartFrame;
+            
+            if (frameCount < 12) {
+                // Sprite has fewer frames (like archer or troll)
+                maxIdleFrame = Math.min(3, frameCount);
+                walkStartFrame = Math.min(4, frameCount);
+                maxWalkFrame = Math.min(7, frameCount);
+                attackStartFrame = Math.min(8, frameCount);
+                maxAttackFrame = Math.min(11, frameCount);
+            } else {
+                // Sprite has full frame set
+                maxIdleFrame = 5;
+                walkStartFrame = 6;
+                maxWalkFrame = 11;
+                attackStartFrame = 12;
+                maxAttackFrame = 17;
+            }
+            
+            // Safety check - make sure we don't exceed available frames
+            maxIdleFrame = Math.min(maxIdleFrame, frameCount);
+            maxWalkFrame = Math.min(maxWalkFrame, frameCount);
+            maxAttackFrame = Math.min(maxAttackFrame, frameCount);
+            
+            // IDLE
+            this.anims.create({
+                key: `${type}_idle`,
+                frames: this.anims.generateFrameNumbers(type, { start: 0, end: maxIdleFrame }),
+                frameRate: 8,
+                repeat: -1
+            });
+            
+            // WALK - only if we have enough frames
+            if (walkStartFrame <= frameCount && maxWalkFrame > walkStartFrame) {
+                this.anims.create({
+                    key: `${type}_walk`,
+                    frames: this.anims.generateFrameNumbers(type, { start: walkStartFrame, end: maxWalkFrame }),
+                    frameRate: 12,
+                    repeat: -1
+                });
+            } else {
+                // Fallback to idle if not enough frames
+                this.anims.create({
+                    key: `${type}_walk`,
+                    frames: this.anims.generateFrameNumbers(type, { start: 0, end: maxIdleFrame }),
+                    frameRate: 10,
+                    repeat: -1
+                });
+            }
+            
+            // ATTACK - only if we have enough frames
+            if (attackStartFrame <= frameCount && maxAttackFrame > attackStartFrame) {
+                this.anims.create({
+                    key: `${type}_attack`,
+                    frames: this.anims.generateFrameNumbers(type, { start: attackStartFrame, end: maxAttackFrame }),
+                    frameRate: 15,
+                    repeat: 0
+                });
+            } else {
+                // Fallback to idle if not enough frames
+                this.anims.create({
+                    key: `${type}_attack`,
+                    frames: this.anims.generateFrameNumbers(type, { start: 0, end: maxIdleFrame }),
+                    frameRate: 12,
+                    repeat: 0
+                });
+            }
+            
+            console.log(`  ✓ ${type}: ${frameCount + 1} frames available`);
+        });
+        
+        console.log('✅ Animations created!');
+    }
+    
+    updateSpriteAnimation(sprite, isMoving, isAttacking) {
+        if (!sprite || !sprite.active) return;
+        
+        const spriteKey = sprite.texture.key;
+        
+        // Safety check - make sure animations exist
+        if (!this.anims.exists(`${spriteKey}_idle`)) {
+            console.warn(`Animation ${spriteKey}_idle not found`);
+            return;
+        }
+        
+        if (isAttacking) {
+            if (this.anims.exists(`${spriteKey}_attack`) && 
+                (!sprite.anims.currentAnim || sprite.anims.currentAnim.key !== `${spriteKey}_attack`)) {
+                sprite.play(`${spriteKey}_attack`);
+                
+                sprite.once('animationcomplete', () => {
+                    if (sprite && sprite.active) {
+                        const velocity = sprite.body ? sprite.body.velocity : null;
+                        const moving = velocity && (Math.abs(velocity.x) > 10 || Math.abs(velocity.y) > 10);
+                        
+                        if (moving && this.anims.exists(`${spriteKey}_walk`)) {
+                            sprite.play(`${spriteKey}_walk`);
+                        } else if (this.anims.exists(`${spriteKey}_idle`)) {
+                            sprite.play(`${spriteKey}_idle`);
+                        }
+                    }
+                });
+            }
+        } else if (isMoving) {
+            if (this.anims.exists(`${spriteKey}_walk`) && 
+                (!sprite.anims.currentAnim || sprite.anims.currentAnim.key !== `${spriteKey}_walk`)) {
+                sprite.play(`${spriteKey}_walk`);
+            }
+        } else {
+            if (!sprite.anims.currentAnim || sprite.anims.currentAnim.key !== `${spriteKey}_idle`) {
+                sprite.play(`${spriteKey}_idle`);
+            }
+        }
+    }
+    
+    createParticleSystems() {
+        console.log('✨ Creating particle systems...');
+        
+        // Phaser 3.70 uses new particle system API
+        // Blood particles (red)
+        this.bloodEmitter = this.add.particles(0, 0, 'blood', {
+            speed: { min: 100, max: 300 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1.5, end: 0 },
+            alpha: { start: 1, end: 0 },
+            lifespan: 600,
+            gravityY: 300,
+            emitting: false
+        });
+        
+        // Impact particles (yellow/orange for attacks)
+        this.impactEmitter = this.add.particles(0, 0, 'blood', {
+            speed: { min: 150, max: 250 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1, end: 0 },
+            alpha: { start: 1, end: 0 },
+            lifespan: 400,
+            tint: 0xffaa00,
+            emitting: false
+        });
+        
+        // Gold particles for powerups
+        this.goldEmitter = this.add.particles(0, 0, 'blood', {
+            speed: { min: 50, max: 150 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1.2, end: 0 },
+            alpha: { start: 1, end: 0 },
+            lifespan: 800,
+            gravityY: -100,
+            tint: 0xffd700,
+            emitting: false
+        });
+        
+        console.log('✅ Particle systems ready!');
+    }
+    
+    screenShake(intensity = 0.01, duration = 200) {
+        this.cameras.main.shake(duration, intensity);
+    }
+    
+    screenFlash(color = 0xffffff, alpha = 0.5, duration = 100) {
+        this.cameras.main.flash(duration, 
+            (color >> 16) & 0xff,
+            (color >> 8) & 0xff,
+            color & 0xff,
+            false,
+            null,
+            alpha
+        );
+    }
+    
+    emitBlood(x, y, amount = 10) {
+        this.bloodEmitter.explode(amount, x, y);
+    }
+    
+    emitImpact(x, y, amount = 5) {
+        this.impactEmitter.explode(amount, x, y);
+    }
+    
+    emitGold(x, y, amount = 15) {
+        this.goldEmitter.explode(amount, x, y);
+    }
+    
+    showDamageText(x, y, damage, isCrit = false) {
+        const color = isCrit ? '#ff0000' : '#ffaa00';
+        const fontSize = isCrit ? '32px' : '24px';
+        const text = isCrit ? `${damage}!` : `${damage}`;
+        
+        const damageText = this.add.text(x, y, text, {
+            fontSize: fontSize,
+            color: color,
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: damageText,
+            y: damageText.y - 50,
+            alpha: 0,
+            scale: isCrit ? 1.5 : 1.2,
+            duration: 800,
+            ease: 'Cubic.easeOut',
+            onComplete: () => damageText.destroy()
+        });
+    }
+    
+    energyRing(x, y, color = 0x00ffff, maxRadius = 150) {
+        const ring1 = this.add.circle(x, y, 20, color, 0.6);
+        const ring2 = this.add.circle(x, y, 15, color, 0.8);
+        
+        this.tweens.add({
+            targets: ring1,
+            radius: maxRadius,
+            alpha: 0,
+            duration: 500,
+            ease: 'Cubic.easeOut',
+            onComplete: () => ring1.destroy()
+        });
+        
+        this.tweens.add({
+            targets: ring2,
+            radius: maxRadius * 0.8,
+            alpha: 0,
+            duration: 400,
+            ease: 'Cubic.easeOut',
+            onComplete: () => ring2.destroy()
+        });
+    }
+    
+    shockwave(x, y, color = 0xffffff, maxRadius = 300) {
+        const wave = this.add.circle(x, y, 10, color, 0);
+        wave.setStrokeStyle(4, color, 1);
+        
+        this.tweens.add({
+            targets: wave,
+            radius: maxRadius,
+            alpha: 0,
+            duration: 600,
+            ease: 'Cubic.easeOut',
+            onComplete: () => wave.destroy()
+        });
+        
+        this.screenShake(0.01, 200);
+    }
+    
+    levelUpEffect(x, y) {
+        const colors = [0xff0000, 0xff6600, 0xffaa00, 0xffd700, 0xffff00];
+        
+        colors.forEach((color, index) => {
+            this.time.delayedCall(index * 50, () => {
+                this.energyRing(x, y, color, 200);
+            });
+        });
+        
+        this.goldEmitter.explode(50, x, y);
+        this.screenFlash(0xffd700, 0.5, 200);
+        this.screenShake(0.02, 300);
+    }
+    
+    deathExplosion(x, y, isBoss = false) {
+        const shakeIntensity = isBoss ? 0.02 : 0.008;
+        const flashColor = isBoss ? 0xff0000 : 0xff6600;
+        
+        this.emitBlood(x, y, isBoss ? 30 : 15);
+        this.shockwave(x, y, flashColor, isBoss ? 400 : 200);
+        this.screenFlash(flashColor, 0.3, 100);
+        this.screenShake(shakeIntensity, 300);
+    }
+    
+    powerupCollectionEffect(x, y, type) {
+        const colors = {
+            speed: 0x00ffff,
+            damage: 0xff0000,
+            heal: 0x00ff00
+        };
+        
+        const color = colors[type] || 0xffd700;
+        
+        this.energyRing(x, y, color, 100);
+        this.emitGold(x, y, 20);
+        this.screenFlash(color, 0.2, 100);
+    }
+    
     create() {
-        console.log('🎮 Battle Scene Started - FULL VERSION');
+        console.log('Ã°Å¸Å½Â® Battle Scene Started - FULL VERSION');
+        
+        // Create all animations first
+        this.createAnimations();
+        
+        // Create particle systems for juicy effects
+        this.createParticleSystems();
         
         // Initialize core variables (from original)
         this.levelConfig = gameData.getCurrentLevelConfig();
@@ -150,23 +488,9 @@ class BattleScene extends Phaser.Scene {
             }
         }, 1000);
     }
-    
     createAllTextures() {
-        const heroClass = gameData.data.hero.class;
-        const classConfig = GameConfig.classes[heroClass];
-        
-        this.createEmojiTexture('player', classConfig.icon, 64);
-        this.createEmojiTexture('knight', GameConfig.units.knight.icon, 56);
-        this.createEmojiTexture('archer', GameConfig.units.archer.icon, 52);
-        this.createEmojiTexture('goblin', GameConfig.enemies.goblin.icon, 48);
-        this.createEmojiTexture('orc', GameConfig.enemies.orc.icon, 52);
-        this.createEmojiTexture('troll', GameConfig.enemies.troll.icon, 60);
-        this.createEmojiTexture('dragon', GameConfig.enemies.dragon.icon, 80);
-        this.createEmojiTexture('powerup-speed', '⚡', 40);
-        this.createEmojiTexture('powerup-damage', '💪', 40);
-        this.createEmojiTexture('powerup-heal', '❤️', 40);
-        
-        // Attack graphics
+        // SVG icons are already loaded via preload()
+        // Just create the projectile graphics
         const swordGfx = this.add.graphics();
         swordGfx.fillStyle(0xffff00, 1);
         swordGfx.fillRect(0, 0, 4, 12);
@@ -202,7 +526,8 @@ class BattleScene extends Phaser.Scene {
     }
     
     createPlayer(x, y) {
-        this.player = this.physics.add.sprite(x, y, 'player');
+        this.player = this.physics.add.sprite(x, y, 'player', 0);
+        this.player.setScale(0.7);
         this.player.setData('hp', this.heroStats.hp);
         this.player.setData('maxHp', this.heroStats.maxHp);
         this.player.setData('damage', this.heroStats.damage);
@@ -211,6 +536,9 @@ class BattleScene extends Phaser.Scene {
         this.player.setData('lastAttack', 0);
         this.player.setData('team', 'blue');
         this.player.setData('isPlayer', true);
+        
+        // Start with idle animation
+        this.player.play('player_idle');
         
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     }
@@ -245,6 +573,8 @@ class BattleScene extends Phaser.Scene {
             texture
         );
         
+        ally.setFrame(0);
+        ally.setScale(0.6);
         ally.setData('team', 'blue');
         ally.setData('isArcher', isArcher);
         
@@ -263,6 +593,9 @@ class BattleScene extends Phaser.Scene {
         }
         
         ally.setData('lastAttack', 0);
+        
+        // Start with idle animation
+        ally.play(`${texture}_idle`);
         
         // Spawn animation
         ally.setScale(0);
@@ -341,7 +674,7 @@ class BattleScene extends Phaser.Scene {
         }).setOrigin(1, 0).setScrollFactor(0).setDepth(2000);
         
         // Bottom center - legend
-        this.add.text(width / 2, height - 25, '🎮 Click to Move | Q - Dash | E - AOE Attack', {
+        this.add.text(width / 2, height - 25, 'Ã°Å¸Å½Â® Click to Move | Q - Dash | E - AOE Attack', {
             fontSize: '18px',
             color: '#aaaaaa',
             stroke: '#000000',
@@ -356,7 +689,7 @@ class BattleScene extends Phaser.Scene {
         
         if (this.currentWave > this.levelConfig.waves) return;
         
-        console.log(`🌊 Wave ${this.currentWave}/${this.levelConfig.waves}`);
+        console.log(`Ã°Å¸Å’Å  Wave ${this.currentWave}/${this.levelConfig.waves}`);
         this.waveText.setText(`Wave: ${this.currentWave}/${this.levelConfig.waves}`);
         
         const enemyTypes = this.levelConfig.enemyTypes;
@@ -399,6 +732,8 @@ class BattleScene extends Phaser.Scene {
         
         const mob = this.mobs.create(x, y, type);
         mob.setData('type', type);
+        mob.setFrame(0);
+        mob.setScale(1.0);
         mob.setData('team', 'mob');
         mob.setData('hp', config.hp);
         mob.setData('maxHp', config.hp);
@@ -409,6 +744,9 @@ class BattleScene extends Phaser.Scene {
         mob.setData('lastAttack', 0);
         mob.setData('goldReward', config.goldReward);
         mob.setData('isMob', true);
+        
+        // Start with idle animation
+        mob.play(`${type}_idle`);
         
         this.enemiesAlive++;
     }
@@ -428,6 +766,8 @@ class BattleScene extends Phaser.Scene {
         }
         
         const boss = this.bosses.create(x, y, 'dragon');
+        boss.setFrame(0);
+        boss.setScale(0.8);
         boss.setData('hp', config.hp);
         boss.setData('maxHp', config.hp);
         boss.setData('damage', config.damage);
@@ -438,6 +778,9 @@ class BattleScene extends Phaser.Scene {
         boss.setData('goldReward', config.goldReward);
         boss.setData('team', 'boss');
         boss.setData('isBoss', true);
+        
+        // Start with idle animation
+        boss.play('dragon_idle');
         
         this.enemiesAlive++;
     }
@@ -455,6 +798,7 @@ class BattleScene extends Phaser.Scene {
         );
         
         powerup.setData('type', type);
+        powerup.setScale(1.0);
         
         this.tweens.add({
             targets: powerup,
@@ -489,6 +833,10 @@ class BattleScene extends Phaser.Scene {
             ease: 'Power2'
         });
         
+        // Cool effects!
+        this.energyRing(this.player.x, this.player.y, 0x00ffff, 80);
+        this.screenShake(0.005, 100);
+        
         const trail = this.add.circle(this.player.x, this.player.y, 40, 0xffd700, 0.5);
         this.tweens.add({
             targets: trail,
@@ -512,6 +860,12 @@ class BattleScene extends Phaser.Scene {
         
         const range = GameConfig.abilities.aoe.range;
         const damage = this.heroStats.damage * 2;
+        
+        // EPIC AOE EFFECTS!
+        this.shockwave(this.player.x, this.player.y, 0xff0000, range);
+        this.screenFlash(0xff0000, 0.3, 100);
+        this.screenShake(0.015, 200);
+        this.emitBlood(this.player.x, this.player.y, 30);
         
         const aoeCircle = this.add.circle(this.player.x, this.player.y, range, 0xff0000, 0.3);
         this.tweens.add({
@@ -552,7 +906,7 @@ class BattleScene extends Phaser.Scene {
             this.heroStats.range += 2;
             
             if (this.player && this.player.active) {
-                const levelUpText = this.add.text(this.player.x, this.player.y - 50, '⬆️ LEVEL UP!', {
+                const levelUpText = this.add.text(this.player.x, this.player.y - 50, 'Ã¢Â¬â€ Ã¯Â¸Â LEVEL UP!', {
                     fontSize: '32px',
                     color: '#ffd700',
                     fontStyle: 'bold',
@@ -585,7 +939,7 @@ class BattleScene extends Phaser.Scene {
         const seconds = Math.max(0, Math.floor(this.timeRemaining / 1000));
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        this.timeText.setText(`⏱️ ${minutes}:${secs.toString().padStart(2, '0')}`);
+        this.timeText.setText(`Ã¢ÂÂ±Ã¯Â¸Â ${minutes}:${secs.toString().padStart(2, '0')}`);
         
         // Victory
         if (this.timeRemaining <= 0 || (this.currentWave >= this.levelConfig.waves && this.enemiesAlive === 0)) {
@@ -625,6 +979,11 @@ class BattleScene extends Phaser.Scene {
         
         // Update UI
         this.castleHPText.setText(`Castle: ${Math.round(this.castle.hp)}/${this.castle.maxHp}`);
+        
+        // Update animations based on movement
+        this.updatePlayerAnimation();
+        this.updateAlliesAnimations();
+        this.updateEnemiesAnimations();
     }
     
     updatePlayerMovement() {
@@ -793,6 +1152,9 @@ class BattleScene extends Phaser.Scene {
             attacker.setData('lastAttack', time);
             const damage = attacker.getData('damage');
             
+            // Trigger attack animation
+            attacker.setData('isAttacking', true);
+            
             if (isArcher) {
                 const arrow = this.add.sprite(attacker.x, attacker.y, 'arrow');
                 const angle = Phaser.Math.Angle.Between(attacker.x, attacker.y, nearest.x, nearest.y);
@@ -853,6 +1215,7 @@ class BattleScene extends Phaser.Scene {
         const distToCastle = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castle.x, this.castle.y);
         if (distToCastle < range) {
             enemy.setData('lastAttack', time);
+            enemy.setData('isAttacking', true);
             this.castle.hp = Math.max(0, this.castle.hp - damage);
             return;
         }
@@ -860,6 +1223,7 @@ class BattleScene extends Phaser.Scene {
         const distToPlayer = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
         if (distToPlayer < range) {
             enemy.setData('lastAttack', time);
+            enemy.setData('isAttacking', true);
             const hp = this.player.getData('hp') - damage;
             this.player.setData('hp', Math.max(0, hp));
             return;
@@ -870,6 +1234,7 @@ class BattleScene extends Phaser.Scene {
             const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, ally.x, ally.y);
             if (dist < range) {
                 enemy.setData('lastAttack', time);
+                enemy.setData('isAttacking', true);
                 const hp = ally.getData('hp') - damage;
                 ally.setData('hp', Math.max(0, hp));
                 if (hp <= 0) {
@@ -896,26 +1261,27 @@ class BattleScene extends Phaser.Scene {
         const hp = mob.getData('hp') - damage;
         mob.setData('hp', hp);
         
+        // Critical hit chance (10%)
+        const isCrit = Math.random() < 0.1;
+        const actualDamage = isCrit ? damage * 2 : damage;
+        
+        // Hit flash
         mob.setTint(0xffffff);
         this.time.delayedCall(80, () => {
             if (mob && mob.active) mob.clearTint();
         });
         
-        for (let i = 0; i < 3; i++) {
-            const blood = this.add.sprite(mob.x, mob.y, 'blood');
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 15 + 10;
-            
-            this.tweens.add({
-                targets: blood,
-                x: mob.x + Math.cos(angle) * dist,
-                y: mob.y + Math.sin(angle) * dist,
-                alpha: 0,
-                scale: { from: 1, to: 0.3 },
-                duration: 350,
-                onComplete: () => blood.destroy()
-            });
-        }
+        // Blood particles (use new particle system)
+        this.emitBlood(mob.x, mob.y, 8);
+        
+        // Impact effect
+        this.emitImpact(mob.x, mob.y, 3);
+        
+        // Damage text
+        this.showDamageText(mob.x, mob.y - 20, Math.round(actualDamage), isCrit);
+        
+        // Small screen shake on hit
+        this.screenShake(0.003, 50);
         
         if (hp <= 0) {
             this.killMob(mob);
@@ -926,10 +1292,21 @@ class BattleScene extends Phaser.Scene {
         const hp = boss.getData('hp') - damage;
         boss.setData('hp', hp);
         
-        boss.setTint(0xffffff);
-        this.time.delayedCall(80, () => {
+        // Boss hits always feel BIG
+        boss.setTint(0xff0000);
+        this.time.delayedCall(100, () => {
             if (boss && boss.active) boss.clearTint();
         });
+        
+        // MORE particles for boss
+        this.emitBlood(boss.x, boss.y, 15);
+        this.emitImpact(boss.x, boss.y, 8);
+        
+        // Bigger damage text
+        this.showDamageText(boss.x, boss.y - 30, Math.round(damage), false);
+        
+        // BIGGER screen shake
+        this.screenShake(0.008, 100);
         
         if (hp <= 0) {
             this.killBoss(boss);
@@ -954,18 +1331,8 @@ class BattleScene extends Phaser.Scene {
             this.nextAllyAt += 3;
         }
         
-        for (let i = 0; i < 8; i++) {
-            const particle = this.add.circle(mob.x, mob.y, 3 + Math.random() * 3, 0xff4444);
-            const angle = (Math.PI * 2 * i) / 8;
-            this.tweens.add({
-                targets: particle,
-                x: mob.x + Math.cos(angle) * 40,
-                y: mob.y + Math.sin(angle) * 40,
-                alpha: 0,
-                duration: 400,
-                onComplete: () => particle.destroy()
-            });
-        }
+        // Death explosion effect!
+        this.deathExplosion(mob.x, mob.y, false);
         
         mob.destroy();
     }
@@ -980,32 +1347,24 @@ class BattleScene extends Phaser.Scene {
         this.killText.setText(`Kills: ${this.kills}`);
         this.gainXP(100);
         
-        for (let i = 0; i < 16; i++) {
-            const particle = this.add.circle(boss.x, boss.y, 5, 0xff0000);
-            const angle = (Math.PI * 2 * i) / 16;
-            this.tweens.add({
-                targets: particle,
-                x: boss.x + Math.cos(angle) * 80,
-                y: boss.y + Math.sin(angle) * 80,
-                alpha: 0,
-                duration: 600,
-                onComplete: () => particle.destroy()
-            });
-        }
+        // EPIC BOSS DEATH EXPLOSION!
+        this.deathExplosion(boss.x, boss.y, true);
         
         const text = this.add.text(boss.x, boss.y, '💀 BOSS DEFEATED! 💀', {
-            fontSize: '32px',
+            fontSize: '48px',
             color: '#ff0000',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 6
+            strokeThickness: 8
         }).setOrigin(0.5);
         
         this.tweens.add({
             targets: text,
-            y: text.y - 80,
+            y: text.y - 100,
             alpha: 0,
-            duration: 2000,
+            scale: 1.5,
+            duration: 2500,
+            ease: 'Cubic.easeOut',
             onComplete: () => text.destroy()
         });
         
@@ -1026,6 +1385,9 @@ class BattleScene extends Phaser.Scene {
     collectPowerup(powerup) {
         const type = powerup.getData('type');
         
+        // Use our fancy effect system!
+        this.powerupCollectionEffect(powerup.x, powerup.y, type);
+        
         const text = this.add.text(powerup.x, powerup.y - 20, '', {
             fontSize: '20px',
             color: '#ffd700',
@@ -1035,12 +1397,12 @@ class BattleScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         if (type === 'speed') {
-            text.setText('⚡ SPEED BOOST!');
+            text.setText('Ã¢Å¡Â¡ SPEED BOOST!');
             const old = this.heroStats.speed;
             this.heroStats.speed *= 1.5;
             this.time.delayedCall(8000, () => { this.heroStats.speed = old; });
         } else if (type === 'damage') {
-            text.setText('💪 DAMAGE BOOST!');
+            text.setText('Ã°Å¸â€™Âª DAMAGE BOOST!');
             const old = this.heroStats.damage;
             this.heroStats.damage *= 2;
             this.player.setData('damage', this.heroStats.damage);
@@ -1049,7 +1411,7 @@ class BattleScene extends Phaser.Scene {
                 this.player.setData('damage', old);
             });
         } else {
-            text.setText('❤️ HEAL!');
+            text.setText('Ã¢ÂÂ¤Ã¯Â¸Â HEAL!');
             this.heroStats.hp = this.heroStats.maxHp;
             this.player.setData('hp', this.heroStats.hp);
         }
@@ -1137,7 +1499,7 @@ class BattleScene extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
             .setScrollFactor(0).setDepth(3000);
         
-        this.add.text(width / 2, height / 2 - 100, '🏆 VICTORY! 🏆', {
+        this.add.text(width / 2, height / 2 - 100, 'Ã°Å¸Ââ€  VICTORY! Ã°Å¸Ââ€ ', {
             fontSize: '64px',
             color: '#ffd700',
             fontStyle: 'bold',
@@ -1153,7 +1515,7 @@ class BattleScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(0.5).setScrollFactor(0).setDepth(3001);
         
-        this.createButton(width / 2, height / 2 + 120, 'Continue →', () => {
+        this.createButton(width / 2, height / 2 + 120, 'Continue Ã¢â€ â€™', () => {
             this.scene.start('CastleScene');
         });
     }
@@ -1164,7 +1526,7 @@ class BattleScene extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
             .setScrollFactor(0).setDepth(3000);
         
-        this.add.text(width / 2, height / 2 - 100, '💀 DEFEATED 💀', {
+        this.add.text(width / 2, height / 2 - 100, 'Ã°Å¸â€™â‚¬ DEFEATED Ã°Å¸â€™â‚¬', {
             fontSize: '64px',
             color: '#ff0000',
             fontStyle: 'bold',
@@ -1183,7 +1545,7 @@ class BattleScene extends Phaser.Scene {
             this.scene.restart();
         });
         
-        this.createButton(width / 2, height / 2 + 130, '← Castle', () => {
+        this.createButton(width / 2, height / 2 + 130, 'Ã¢â€ Â Castle', () => {
             this.scene.start('CastleScene');
         });
     }
@@ -1219,5 +1581,82 @@ class BattleScene extends Phaser.Scene {
         ctx.fillText(emoji, size / 2, size / 2);
         
         this.textures.addCanvas(key, canvas);
+    }
+    
+    updatePlayerAnimation() {
+        if (!this.player || !this.player.active) return;
+        
+        const velocity = this.player.body.velocity;
+        const isMoving = Math.abs(velocity.x) > 10 || Math.abs(velocity.y) > 10;
+        const isAttacking = this.player.getData('isAttacking') || false;
+        
+        this.updateSpriteAnimation(this.player, isMoving, isAttacking);
+        
+        // Reset attacking flag after a frame
+        if (isAttacking) {
+            this.time.delayedCall(50, () => {
+                if (this.player && this.player.active) {
+                    this.player.setData('isAttacking', false);
+                }
+            });
+        }
+    }
+    
+    updateAlliesAnimations() {
+        this.allies.children.entries.forEach(ally => {
+            if (!ally || !ally.active) return;
+            
+            const velocity = ally.body.velocity;
+            const isMoving = Math.abs(velocity.x) > 10 || Math.abs(velocity.y) > 10;
+            const isAttacking = ally.getData('isAttacking') || false;
+            
+            this.updateSpriteAnimation(ally, isMoving, isAttacking);
+            
+            if (isAttacking) {
+                this.time.delayedCall(50, () => {
+                    if (ally && ally.active) {
+                        ally.setData('isAttacking', false);
+                    }
+                });
+            }
+        });
+    }
+    
+    updateEnemiesAnimations() {
+        this.mobs.children.entries.forEach(mob => {
+            if (!mob || !mob.active) return;
+            
+            const velocity = mob.body.velocity;
+            const isMoving = Math.abs(velocity.x) > 10 || Math.abs(velocity.y) > 10;
+            const isAttacking = mob.getData('isAttacking') || false;
+            
+            this.updateSpriteAnimation(mob, isMoving, isAttacking);
+            
+            if (isAttacking) {
+                this.time.delayedCall(50, () => {
+                    if (mob && mob.active) {
+                        mob.setData('isAttacking', false);
+                    }
+                });
+            }
+        });
+        
+        this.bosses.children.entries.forEach(boss => {
+            if (!boss || !boss.active) return;
+            
+            const velocity = boss.body.velocity;
+            const isMoving = Math.abs(velocity.x) > 10 || Math.abs(velocity.y) > 10;
+            const isAttacking = boss.getData('isAttacking') || false;
+            
+            this.updateSpriteAnimation(boss, isMoving, isAttacking);
+            
+            if (isAttacking) {
+                this.time.delayedCall(50, () => {
+                    if (boss && boss.active) {
+                        boss.setData('isAttacking', false);
+                    }
+                });
+            }
+        });
     }
 }
