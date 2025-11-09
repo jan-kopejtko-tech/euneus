@@ -33,14 +33,227 @@
         }
         #game-container {
             box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
+            position: relative;
         }
         canvas {
             display: block;
             margin: 0 auto;
         }
+        
+        /* Hero HUD Overlay */
+        #hero-hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 4000;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+            display: none;
+        }
+        #hero-hud .hud-panel {
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+            min-width: 250px;
+        }
+        #hero-hud .hero-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        #hero-icon {
+            font-size: 48px;
+        }
+        #hero-class {
+            color: #ffd700;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #hero-level {
+            color: #00ff00;
+            font-size: 18px;
+        }
+        .stat-bar {
+            margin: 8px 0;
+        }
+        .stat-bar-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: white;
+            margin-bottom: 3px;
+        }
+        .stat-bar-bg {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #hp-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6b6b);
+            transition: width 0.3s;
+        }
+        #xp-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            transition: width 0.3s;
+        }
+        .xp-bar-bg {
+            height: 15px;
+        }
+        .stats-grid {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        .stat-row span:last-child {
+            color: white;
+        }
+        
+        /* Abilities Bar */
+        #abilities-bar {
+            margin-top: 15px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+        }
+        .abilities-container {
+            display: flex;
+            gap: 10px;
+        }
+        .ability {
+            width: 60px;
+            height: 60px;
+            background: #2a2a2a;
+            border: 2px solid #666;
+            border-radius: 8px;
+            position: relative;
+            cursor: pointer;
+        }
+        .ability-icon {
+            font-size: 32px;
+            text-align: center;
+            line-height: 56px;
+        }
+        .ability-key {
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+        }
+        .ability-cooldown {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            border-radius: 6px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .ability-cooldown.active {
+            display: flex;
+        }
+        #abilities-description {
+            color: #aaa;
+            font-size: 11px;
+            margin-top: 5px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
+    <!-- Hero HUD Overlay -->
+    <div id="hero-hud">
+        <div class="hud-panel">
+            <div class="hero-header">
+                <div id="hero-icon"></div>
+                <div>
+                    <div id="hero-class"></div>
+                    <div id="hero-level"></div>
+                </div>
+            </div>
+            
+            <!-- HP Bar -->
+            <div class="stat-bar">
+                <div class="stat-bar-header">
+                    <span id="hp-label">HP</span>
+                    <span id="hp-text">100/100</span>
+                </div>
+                <div class="stat-bar-bg">
+                    <div id="hp-bar"></div>
+                </div>
+            </div>
+            
+            <!-- XP Bar -->
+            <div class="stat-bar">
+                <div class="stat-bar-header">
+                    <span id="xp-label">XP</span>
+                    <span id="xp-text">0/100</span>
+                </div>
+                <div class="stat-bar-bg xp-bar-bg">
+                    <div id="xp-bar"></div>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-row">
+                    <span id="damage-label">⚔️ Damage</span>
+                    <span id="stat-damage">20</span>
+                </div>
+                <div class="stat-row">
+                    <span id="speed-label">🏃 Speed</span>
+                    <span id="stat-speed">220</span>
+                </div>
+                <div class="stat-row">
+                    <span id="range-label">🎯 Range</span>
+                    <span id="stat-range">80</span>
+                </div>
+                <div class="stat-row">
+                    <span id="army-label">👥 Army</span>
+                    <span id="stat-army">1</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Abilities -->
+        <div id="abilities-bar">
+            <div class="abilities-container">
+                <div class="ability" data-key="Q">
+                    <div class="ability-icon ability-icon-dash">💨</div>
+                    <div class="ability-key">Q</div>
+                    <div class="ability-cooldown"></div>
+                </div>
+                <div class="ability" data-key="E">
+                    <div class="ability-icon ability-icon-aoe">💥</div>
+                    <div class="ability-key">E</div>
+                    <div class="ability-cooldown"></div>
+                </div>
+            </div>
+            <div id="abilities-description">Q - Dash | E - AOE Attack</div>
+        </div>
+    </div>
+    
     <div id="game-container"></div>
     
     <script>

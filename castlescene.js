@@ -155,12 +155,38 @@ class CastleScene extends Phaser.Scene {
             color: '#aaaaaa'
         }).setOrigin(0);
         
-        // Start Level button (BIG and prominent)
-        const startBtn = this.add.rectangle(width - 150, height - 50, 260, 70, 0x00aa00)
+        // TEMPORARY DEBUG BUTTON - Very obvious at top of screen
+        const debugStartBtn = this.add.rectangle(width / 2, 100, 400, 100, 0xff0000)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(9999);
+        
+        const debugStartText = this.add.text(width / 2, 100, '🎮 CLICK HERE TO START BATTLE', {
+            fontSize: '24px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            backgroundColor: '#000000',
+            padding: { x: 10, y: 10 }
+        }).setOrigin(0.5).setDepth(10000);
+        
+        debugStartBtn.on('pointerover', () => {
+            debugStartBtn.setFillStyle(0xff6666);
+        });
+        
+        debugStartBtn.on('pointerout', () => {
+            debugStartBtn.setFillStyle(0xff0000);
+        });
+        
+        debugStartBtn.on('pointerdown', () => {
+            console.log('DEBUG: Start button clicked!');
+            this.startLevel();
+        });
+        
+        // Start Level button (BIG and prominent) - moved up to be more visible
+        const startBtn = this.add.rectangle(width / 2, height - 120, 300, 80, 0x00aa00)
             .setInteractive({ useHandCursor: true });
         
-        const startText = this.add.text(width - 150, height - 50, GameConfig.text.startLevel, {
-            fontSize: '32px',
+        const startText = this.add.text(width / 2, height - 120, '▶️ ' + GameConfig.text.startLevel, {
+            fontSize: '36px',
             color: '#ffffff',
             fontStyle: 'bold'
         }).setOrigin(0.5);

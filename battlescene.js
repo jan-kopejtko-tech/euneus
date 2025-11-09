@@ -1,13 +1,13 @@
-// BattleScene - Full original game adapted for castle defense
+// BattleScene - FULL ORIGINAL GAME with all mechanics restored
 class BattleScene extends Phaser.Scene {
     constructor() {
         super({ key: 'BattleScene' });
     }
     
     create() {
-        console.log('🎮 Battle Scene Started');
+        console.log('🎮 Battle Scene Started - FULL VERSION');
         
-        // Initialize game state
+        // Initialize core variables (from original)
         this.levelConfig = gameData.getCurrentLevelConfig();
         this.currentWave = 0;
         this.enemiesAlive = 0;
@@ -15,6 +15,28 @@ class BattleScene extends Phaser.Scene {
         this.goldEarned = 0;
         this.timeRemaining = GameConfig.game.levelDuration;
         this.isLevelComplete = false;
+        
+        // Original game variables
+        this.kills = 0;
+        this.nextAllyAt = 3; // Spawn ally every 3 kills!
+        
+        // Hero stats (from GameData)
+        this.heroStats = {
+            level: gameData.data.hero.level,
+            xp: gameData.data.hero.xp || 0,
+            xpToNext: gameData.data.hero.xpToNext || 100,
+            maxHp: gameData.data.hero.maxHp,
+            hp: gameData.data.hero.maxHp,
+            damage: gameData.data.hero.damage,
+            speed: gameData.data.hero.speed,
+            range: gameData.data.hero.range
+        };
+        
+        // Abilities
+        this.abilities = {
+            dash: { cooldown: GameConfig.abilities.dash.cooldown, lastUsed: 0 },
+            aoe: { cooldown: GameConfig.abilities.aoe.cooldown, lastUsed: 0 }
+        };
         
         // World setup
         const WORLD_WIDTH = GameConfig.world.width;
@@ -38,15 +60,15 @@ class BattleScene extends Phaser.Scene {
         
         // Create groups
         this.allies = this.physics.add.group();
-        this.mobs = this.physics.add.group(); // enemies
+        this.mobs = this.physics.add.group();
         this.powerups = this.physics.add.group();
         this.bosses = this.physics.add.group();
         
         // Spawn initial army
         this.spawnInitialArmy();
         
-        // UI
-        this.createUI();
+        // UI - Original style!
+        this.createOriginalUI();
         
         // Input
         this.pointer = this.input.activePointer;
@@ -55,12 +77,78 @@ class BattleScene extends Phaser.Scene {
         // Start waves
         this.time.delayedCall(3000, () => this.spawnWave());
         
-        // Spawn powerups periodically
+        // Spawn powerups
         this.time.addEvent({
-            delay: 15000,
+            delay: 10000,
             callback: () => this.spawnPowerup(),
             loop: true
         });
+        
+        // Spawn initial powerups
+        for (let i = 0; i < 5; i++) {
+            this.spawnPowerup();
+        }
+        
+        // Show and initialize Hero HUD
+        this.showHeroHUD();
+    }
+    
+    showHeroHUD() {
+        const hud = document.getElementById('hero-hud');
+        if (!hud) return;
+        
+        hud.style.display = 'block';
+        
+        // Set hero icon and class
+        const heroClass = gameData.data.hero.class;
+        const classConfig = GameConfig.classes[heroClass];
+        
+        document.getElementById('hero-icon').textContent = classConfig.icon;
+        document.getElementById('hero-class').textContent = classConfig.name.toUpperCase();
+        document.getElementById('hero-level').textContent = `Level ${this.heroStats.level}`;
+        
+        // Set initial stats
+        this.updateHeroHUD();
+    }
+    
+    updateHeroHUD() {
+        // Update HP
+        document.getElementById('hp-text').textContent = `${Math.round(this.heroStats.hp)}/${this.heroStats.maxHp}`;
+        document.getElementById('hp-bar').style.width = `${(this.heroStats.hp / this.heroStats.maxHp) * 100}%`;
+        
+        // Update XP
+        document.getElementById('xp-text').textContent = `${this.heroStats.xp}/${this.heroStats.xpToNext}`;
+        document.getElementById('xp-bar').style.width = `${(this.heroStats.xp / this.heroStats.xpToNext) * 100}%`;
+        
+        // Update level
+        document.getElementById('hero-level').textContent = `Level ${this.heroStats.level}`;
+        
+        // Update stats
+        document.getElementById('stat-damage').textContent = this.heroStats.damage;
+        document.getElementById('stat-speed').textContent = this.heroStats.speed;
+        document.getElementById('stat-range').textContent = this.heroStats.range;
+        document.getElementById('stat-army').textContent = this.allies ? this.allies.children.entries.length + 1 : 1;
+    }
+    
+    startAbilityCooldown(key, cooldownMs) {
+        const ability = document.querySelector(`.ability[data-key="${key}"]`);
+        if (!ability) return;
+        
+        const cooldownDiv = ability.querySelector('.ability-cooldown');
+        let remaining = Math.ceil(cooldownMs / 1000);
+        
+        cooldownDiv.textContent = remaining;
+        cooldownDiv.classList.add('active');
+        
+        const interval = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(interval);
+                cooldownDiv.classList.remove('active');
+            } else {
+                cooldownDiv.textContent = remaining;
+            }
+        }, 1000);
     }
     
     createAllTextures() {
@@ -70,14 +158,13 @@ class BattleScene extends Phaser.Scene {
         this.createEmojiTexture('player', classConfig.icon, 64);
         this.createEmojiTexture('knight', GameConfig.units.knight.icon, 56);
         this.createEmojiTexture('archer', GameConfig.units.archer.icon, 52);
-        this.createEmojiTexture('mob', GameConfig.enemies.goblin.icon, 48);
         this.createEmojiTexture('goblin', GameConfig.enemies.goblin.icon, 48);
         this.createEmojiTexture('orc', GameConfig.enemies.orc.icon, 52);
         this.createEmojiTexture('troll', GameConfig.enemies.troll.icon, 60);
         this.createEmojiTexture('dragon', GameConfig.enemies.dragon.icon, 80);
-        this.createEmojiTexture('powerup-speed', GameConfig.emojis.gold, 40);
-        this.createEmojiTexture('powerup-damage', GameConfig.emojis.gold, 40);
-        this.createEmojiTexture('powerup-heal', GameConfig.emojis.gold, 40);
+        this.createEmojiTexture('powerup-speed', '⚡', 40);
+        this.createEmojiTexture('powerup-damage', '💪', 40);
+        this.createEmojiTexture('powerup-heal', '❤️', 40);
         
         // Attack graphics
         const swordGfx = this.add.graphics();
@@ -104,30 +191,22 @@ class BattleScene extends Phaser.Scene {
     }
     
     createCastle(x, y) {
-        // Visual castle
         this.add.text(x, y, GameConfig.emojis.castle, {
             fontSize: '100px'
         }).setOrigin(0.5);
         
-        // Castle data holder (invisible)
-        this.castle = { 
-            x: x, 
-            y: y,
-            hp: 1000, 
-            maxHp: 1000 
-        };
+        this.castle = { x: x, y: y, hp: 1000, maxHp: 1000 };
         
-        // Defense radius indicator
         this.add.circle(x, y, 250, 0xffd700, 0.05)
             .setStrokeStyle(2, 0xffd700, 0.2);
     }
     
     createPlayer(x, y) {
         this.player = this.physics.add.sprite(x, y, 'player');
-        this.player.setData('hp', gameData.data.hero.maxHp);
-        this.player.setData('maxHp', gameData.data.hero.maxHp);
-        this.player.setData('damage', gameData.data.hero.damage);
-        this.player.setData('attackRange', gameData.data.hero.range);
+        this.player.setData('hp', this.heroStats.hp);
+        this.player.setData('maxHp', this.heroStats.maxHp);
+        this.player.setData('damage', this.heroStats.damage);
+        this.player.setData('attackRange', this.heroStats.range);
         this.player.setData('attackSpeed', 500);
         this.player.setData('lastAttack', 0);
         this.player.setData('team', 'blue');
@@ -140,14 +219,12 @@ class BattleScene extends Phaser.Scene {
         const knights = gameData.data.army.knights || 0;
         const archers = gameData.data.army.archers || 0;
         
-        // Spawn knights
         for (let i = 0; i < knights; i++) {
             const angle = (Math.PI * 2 * i) / Math.max(1, knights);
             const dist = 80 + Math.random() * 30;
             this.spawnAlly('knight', this.player.x + Math.cos(angle) * dist, this.player.y + Math.sin(angle) * dist);
         }
         
-        // Spawn archers  
         for (let i = 0; i < archers; i++) {
             const angle = (Math.PI * 2 * i) / Math.max(1, archers);
             const dist = 120 + Math.random() * 30;
@@ -156,17 +233,120 @@ class BattleScene extends Phaser.Scene {
     }
     
     spawnAlly(type, x, y) {
-        const config = GameConfig.units[type];
-        const ally = this.allies.create(x, y, type);
+        if (this.allies.children.entries.length >= 100) return;
+        
+        const config = GameConfig.units[type || 'knight'];
+        const isArcher = type === 'archer' || Math.random() < 0.4;
+        const texture = isArcher ? 'archer' : 'knight';
+        
+        const ally = this.allies.create(
+            x || this.player.x + (Math.random() - 0.5) * 100,
+            y || this.player.y + (Math.random() - 0.5) * 100,
+            texture
+        );
         
         ally.setData('team', 'blue');
-        ally.setData('isArcher', type === 'archer');
-        ally.setData('hp', config.hp);
-        ally.setData('maxHp', config.hp);
-        ally.setData('damage', config.damage);
-        ally.setData('attackRange', config.range);
-        ally.setData('attackSpeed', config.attackSpeed);
+        ally.setData('isArcher', isArcher);
+        
+        if (isArcher) {
+            ally.setData('hp', 5);
+            ally.setData('maxHp', 5);
+            ally.setData('damage', 2.5);
+            ally.setData('attackRange', 160);
+            ally.setData('attackSpeed', 850);
+        } else {
+            ally.setData('hp', 10);
+            ally.setData('maxHp', 10);
+            ally.setData('damage', 5);
+            ally.setData('attackRange', 75);
+            ally.setData('attackSpeed', 550);
+        }
+        
         ally.setData('lastAttack', 0);
+        
+        // Spawn animation
+        ally.setScale(0);
+        ally.setAlpha(0);
+        this.tweens.add({
+            targets: ally,
+            scale: 1,
+            alpha: 1,
+            duration: 400,
+            ease: 'Back.easeOut'
+        });
+        
+        // Flash effect
+        const flash = this.add.circle(ally.x, ally.y, 50, 0xffaa00, 0.6);
+        this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 2,
+            duration: 400,
+            onComplete: () => flash.destroy()
+        });
+        
+        // Update army text
+        if (this.armyText) {
+            this.armyText.setText(`Army: ${this.allies.children.entries.length + 1}`);
+        }
+        
+        // Update HUD
+        this.updateHeroHUD();
+    }
+    
+    createOriginalUI() {
+        const { width, height } = this.cameras.main;
+        
+        // Top left - kills, gold, wave
+        this.killText = this.add.text(20, 20, `Kills: 0`, {
+            fontSize: '32px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 5
+        }).setScrollFactor(0).setDepth(2000);
+        
+        this.armyText = this.add.text(20, 65, `Army: 1`, {
+            fontSize: '28px',
+            color: '#ffaa00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setScrollFactor(0).setDepth(2000);
+        
+        this.waveText = this.add.text(20, 105, `Wave: 0/${this.levelConfig.waves}`, {
+            fontSize: '24px',
+            color: '#00ffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setScrollFactor(0).setDepth(2000);
+        
+        // Top center - timer
+        this.timeText = this.add.text(width / 2, 20, '', {
+            fontSize: '28px',
+            color: '#ffaa00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(2000);
+        
+        // Top right - castle HP
+        this.castleHPText = this.add.text(width - 20, 20, 'Castle: 1000/1000', {
+            fontSize: '24px',
+            color: '#ff6b6b',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(1, 0).setScrollFactor(0).setDepth(2000);
+        
+        // Bottom center - legend
+        this.add.text(width / 2, height - 25, '🎮 Click to Move | Q - Dash | E - AOE Attack', {
+            fontSize: '18px',
+            color: '#aaaaaa',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(2000);
     }
     
     spawnWave() {
@@ -177,12 +357,11 @@ class BattleScene extends Phaser.Scene {
         if (this.currentWave > this.levelConfig.waves) return;
         
         console.log(`🌊 Wave ${this.currentWave}/${this.levelConfig.waves}`);
-        this.waveText.setText(`${GameConfig.text.wave}: ${this.currentWave}/${this.levelConfig.waves}`);
+        this.waveText.setText(`Wave: ${this.currentWave}/${this.levelConfig.waves}`);
         
         const enemyTypes = this.levelConfig.enemyTypes;
         const count = this.levelConfig.enemiesPerWave;
         
-        // Spawn enemies
         for (let i = 0; i < count; i++) {
             this.time.delayedCall(i * 300, () => {
                 const type = Phaser.Utils.Array.GetRandom(enemyTypes);
@@ -190,7 +369,6 @@ class BattleScene extends Phaser.Scene {
             });
         }
         
-        // Boss wave
         if (this.levelConfig.bossWave && this.currentWave === this.levelConfig.waves) {
             const bossCount = this.levelConfig.bossCount || 1;
             for (let i = 0; i < bossCount; i++) {
@@ -200,7 +378,6 @@ class BattleScene extends Phaser.Scene {
             }
         }
         
-        // Next wave
         if (this.currentWave < this.levelConfig.waves) {
             this.time.delayedCall(GameConfig.game.waveInterval, () => this.spawnWave());
         }
@@ -211,7 +388,6 @@ class BattleScene extends Phaser.Scene {
         const WORLD_WIDTH = this.physics.world.bounds.width;
         const WORLD_HEIGHT = this.physics.world.bounds.height;
         
-        // Random edge
         const side = Math.floor(Math.random() * 4);
         let x, y;
         switch(side) {
@@ -242,7 +418,6 @@ class BattleScene extends Phaser.Scene {
         const WORLD_WIDTH = this.physics.world.bounds.width;
         const WORLD_HEIGHT = this.physics.world.bounds.height;
         
-        // Random edge
         const side = Math.floor(Math.random() * 4);
         let x, y;
         switch(side) {
@@ -290,70 +465,16 @@ class BattleScene extends Phaser.Scene {
         });
     }
     
-    createUI() {
-        const { width } = this.cameras.main;
-        
-        this.waveText = this.add.text(20, 20, `${GameConfig.text.wave}: 0/0`, {
-            fontSize: '28px',
-            color: '#ffffff',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setScrollFactor(0).setDepth(2000);
-        
-        this.timeText = this.add.text(20, 55, '', {
-            fontSize: '24px',
-            color: '#ffaa00',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setScrollFactor(0).setDepth(2000);
-        
-        this.killsText = this.add.text(20, 85, `${GameConfig.text.kills}: 0`, {
-            fontSize: '24px',
-            color: '#00ff00',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setScrollFactor(0).setDepth(2000);
-        
-        this.goldText = this.add.text(20, 115, `${GameConfig.emojis.gold} +0`, {
-            fontSize: '22px',
-            color: '#ffd700',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setScrollFactor(0).setDepth(2000);
-        
-        this.castleHPText = this.add.text(width - 20, 20, 'Castle: 1000/1000', {
-            fontSize: '24px',
-            color: '#ff6b6b',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(1, 0).setScrollFactor(0).setDepth(2000);
-        
-        this.armyText = this.add.text(width - 20, 50, `Army: ${this.allies.children.entries.length}`, {
-            fontSize: '20px',
-            color: '#ffaa00',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(1, 0).setScrollFactor(0).setDepth(2000);
-    }
-    
     setupAbilities() {
         this.input.keyboard.on('keydown-Q', () => this.useDash());
         this.input.keyboard.on('keydown-E', () => this.useAOE());
-        
-        this.abilities = {
-            dash: { lastUsed: 0 },
-            aoe: { lastUsed: 0 }
-        };
     }
     
     useDash() {
         if (!this.player || !this.player.active) return;
         
         const now = Date.now();
-        if (now - this.abilities.dash.lastUsed < GameConfig.abilities.dash.cooldown) return;
+        if (now - this.abilities.dash.lastUsed < this.abilities.dash.cooldown) return;
         
         this.abilities.dash.lastUsed = now;
         
@@ -376,18 +497,21 @@ class BattleScene extends Phaser.Scene {
             duration: 300,
             onComplete: () => trail.destroy()
         });
+        
+        // Show cooldown in HUD
+        this.startAbilityCooldown('Q', this.abilities.dash.cooldown);
     }
     
     useAOE() {
         if (!this.player || !this.player.active) return;
         
         const now = Date.now();
-        if (now - this.abilities.aoe.lastUsed < GameConfig.abilities.aoe.cooldown) return;
+        if (now - this.abilities.aoe.lastUsed < this.abilities.aoe.cooldown) return;
         
         this.abilities.aoe.lastUsed = now;
         
         const range = GameConfig.abilities.aoe.range;
-        const damage = gameData.data.hero.damage * 2;
+        const damage = this.heroStats.damage * 2;
         
         const aoeCircle = this.add.circle(this.player.x, this.player.y, range, 0xff0000, 0.3);
         this.tweens.add({
@@ -398,7 +522,6 @@ class BattleScene extends Phaser.Scene {
             onComplete: () => aoeCircle.destroy()
         });
         
-        // Damage all enemies in range
         this.mobs.children.entries.forEach(mob => {
             if (!mob.active) return;
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, mob.x, mob.y);
@@ -410,25 +533,67 @@ class BattleScene extends Phaser.Scene {
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, boss.x, boss.y);
             if (dist <= range) this.damageBoss(boss, damage);
         });
+        
+        // Show cooldown in HUD
+        this.startAbilityCooldown('E', this.abilities.aoe.cooldown);
+    }
+    
+    gainXP(amount) {
+        this.heroStats.xp += amount;
+        
+        while (this.heroStats.xp >= this.heroStats.xpToNext) {
+            this.heroStats.xp -= this.heroStats.xpToNext;
+            this.heroStats.level++;
+            this.heroStats.xpToNext = Math.floor(this.heroStats.xpToNext * 1.5);
+            
+            this.heroStats.maxHp += 10;
+            this.heroStats.hp = this.heroStats.maxHp;
+            this.heroStats.damage += 2;
+            this.heroStats.range += 2;
+            
+            if (this.player && this.player.active) {
+                const levelUpText = this.add.text(this.player.x, this.player.y - 50, '⬆️ LEVEL UP!', {
+                    fontSize: '32px',
+                    color: '#ffd700',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 6
+                }).setOrigin(0.5);
+                
+                this.tweens.add({
+                    targets: levelUpText,
+                    y: this.player.y - 100,
+                    alpha: 0,
+                    duration: 2000,
+                    onComplete: () => levelUpText.destroy()
+                });
+            }
+            
+            this.player.setData('damage', this.heroStats.damage);
+            this.player.setData('attackRange', this.heroStats.range);
+        }
+        
+        // Update HUD
+        this.updateHeroHUD();
     }
     
     update(time, delta) {
         if (this.isLevelComplete) return;
         
-        // Update timer
+        // Timer
         this.timeRemaining -= delta;
         const seconds = Math.max(0, Math.floor(this.timeRemaining / 1000));
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        this.timeText.setText(`Time: ${minutes}:${secs.toString().padStart(2, '0')}`);
+        this.timeText.setText(`⏱️ ${minutes}:${secs.toString().padStart(2, '0')}`);
         
-        // Check victory
+        // Victory
         if (this.timeRemaining <= 0 || (this.currentWave >= this.levelConfig.waves && this.enemiesAlive === 0)) {
             this.levelComplete(true);
             return;
         }
         
-        // Check defeat
+        // Defeat
         if (this.castle.hp <= 0) {
             this.levelComplete(false);
             return;
@@ -444,8 +609,6 @@ class BattleScene extends Phaser.Scene {
         
         // Enemy AI
         this.updateEnemiesAI();
-        
-        // Boss AI
         this.updateBossesAI();
         
         // Combat
@@ -460,9 +623,8 @@ class BattleScene extends Phaser.Scene {
         // Camera zoom
         this.updateCameraZoom();
         
-        // Update castle HP display
+        // Update UI
         this.castleHPText.setText(`Castle: ${Math.round(this.castle.hp)}/${this.castle.maxHp}`);
-        this.armyText.setText(`Army: ${this.allies.children.entries.length + 1}`);
     }
     
     updatePlayerMovement() {
@@ -471,7 +633,7 @@ class BattleScene extends Phaser.Scene {
             this.pointer.worldX, this.pointer.worldY
         );
         
-        const speed = gameData.data.hero.speed;
+        const speed = this.heroStats.speed;
         
         if (distance > 20) {
             const angle = Phaser.Math.Angle.Between(
@@ -489,7 +651,6 @@ class BattleScene extends Phaser.Scene {
             this.player.setVelocity(0, 0);
         }
         
-        // Bounds
         const WORLD_WIDTH = this.physics.world.bounds.width;
         const WORLD_HEIGHT = this.physics.world.bounds.height;
         this.player.x = Phaser.Math.Clamp(this.player.x, 30, WORLD_WIDTH - 30);
@@ -511,7 +672,7 @@ class BattleScene extends Phaser.Scene {
             }
         });
         
-        // Knights - front formation
+        // Knights front
         knights.forEach((knight, index) => {
             const row = Math.floor(index / 10);
             const col = (index % 10) - 4.5;
@@ -533,7 +694,7 @@ class BattleScene extends Phaser.Scene {
             }
         });
         
-        // Archers - back formation
+        // Archers back
         archers.forEach((archer, index) => {
             const row = Math.floor(index / 10);
             const col = (index % 10) - 4.5;
@@ -560,7 +721,6 @@ class BattleScene extends Phaser.Scene {
         this.mobs.children.entries.forEach(mob => {
             if (!mob || !mob.active) return;
             
-            // Move towards castle
             const angle = Phaser.Math.Angle.Between(mob.x, mob.y, this.castle.x, this.castle.y);
             const speed = mob.getData('speed');
             mob.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
@@ -571,7 +731,6 @@ class BattleScene extends Phaser.Scene {
         this.bosses.children.entries.forEach(boss => {
             if (!boss || !boss.active) return;
             
-            // Move towards player or castle (whichever is closer)
             const distToPlayer = Phaser.Math.Distance.Between(boss.x, boss.y, this.player.x, this.player.y);
             const distToCastle = Phaser.Math.Distance.Between(boss.x, boss.y, this.castle.x, this.castle.y);
             
@@ -585,15 +744,12 @@ class BattleScene extends Phaser.Scene {
     }
     
     updateCombat(time) {
-        // Player attacks
         this.autoAttack(this.player, time);
         
-        // Allies attack
         this.allies.children.entries.forEach(ally => {
             if (ally.active) this.autoAttack(ally, time);
         });
         
-        // Enemies attack
         this.mobs.children.entries.forEach(mob => {
             if (mob.active) this.enemyAutoAttack(mob, time);
         });
@@ -615,7 +771,6 @@ class BattleScene extends Phaser.Scene {
         let nearest = null;
         let minDist = attackRange;
         
-        // Find nearest enemy
         this.mobs.children.entries.forEach(mob => {
             if (!mob.active) return;
             const dist = Phaser.Math.Distance.Between(attacker.x, attacker.y, mob.x, mob.y);
@@ -639,7 +794,6 @@ class BattleScene extends Phaser.Scene {
             const damage = attacker.getData('damage');
             
             if (isArcher) {
-                // Arrow projectile
                 const arrow = this.add.sprite(attacker.x, attacker.y, 'arrow');
                 const angle = Phaser.Math.Angle.Between(attacker.x, attacker.y, nearest.x, nearest.y);
                 arrow.setRotation(angle);
@@ -662,7 +816,6 @@ class BattleScene extends Phaser.Scene {
                     }
                 });
             } else {
-                // Melee slash
                 const slash = this.add.sprite(attacker.x, attacker.y, 'sword');
                 slash.setAlpha(0.9);
                 slash.setScale(2);
@@ -697,7 +850,6 @@ class BattleScene extends Phaser.Scene {
         const range = enemy.getData('attackRange');
         const damage = enemy.getData('damage');
         
-        // Priority: Castle > Player > Allies
         const distToCastle = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castle.x, this.castle.y);
         if (distToCastle < range) {
             enemy.setData('lastAttack', time);
@@ -713,7 +865,6 @@ class BattleScene extends Phaser.Scene {
             return;
         }
         
-        // Check allies
         this.allies.children.entries.forEach(ally => {
             if (!ally.active) return;
             const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, ally.x, ally.y);
@@ -722,7 +873,6 @@ class BattleScene extends Phaser.Scene {
                 const hp = ally.getData('hp') - damage;
                 ally.setData('hp', Math.max(0, hp));
                 if (hp <= 0) {
-                    // Death particles
                     for (let i = 0; i < 5; i++) {
                         const particle = this.add.circle(ally.x, ally.y, 2, 0xff4444);
                         const angle = (Math.PI * 2 * i) / 5;
@@ -736,6 +886,7 @@ class BattleScene extends Phaser.Scene {
                         });
                     }
                     ally.destroy();
+                    this.armyText.setText(`Army: ${this.allies.children.entries.length + 1}`);
                 }
             }
         });
@@ -750,7 +901,6 @@ class BattleScene extends Phaser.Scene {
             if (mob && mob.active) mob.clearTint();
         });
         
-        // Blood particles
         for (let i = 0; i < 3; i++) {
             const blood = this.add.sprite(mob.x, mob.y, 'blood');
             const angle = Math.random() * Math.PI * 2;
@@ -790,12 +940,20 @@ class BattleScene extends Phaser.Scene {
         const gold = mob.getData('goldReward');
         this.goldEarned += gold;
         this.totalKills++;
+        this.kills++; // Original kills counter!
         this.enemiesAlive--;
         
-        this.goldText.setText(`${GameConfig.emojis.gold} +${this.goldEarned}`);
-        this.killsText.setText(`${GameConfig.text.kills}: ${this.totalKills}`);
+        this.killText.setText(`Kills: ${this.kills}`);
         
-        // Death particles
+        // Gain XP
+        this.gainXP(10);
+        
+        // SPAWN ALLY EVERY 3 KILLS!
+        if (this.kills >= this.nextAllyAt) {
+            this.spawnAlly();
+            this.nextAllyAt += 3;
+        }
+        
         for (let i = 0; i < 8; i++) {
             const particle = this.add.circle(mob.x, mob.y, 3 + Math.random() * 3, 0xff4444);
             const angle = (Math.PI * 2 * i) / 8;
@@ -816,12 +974,12 @@ class BattleScene extends Phaser.Scene {
         const gold = boss.getData('goldReward');
         this.goldEarned += gold;
         this.totalKills += 5;
+        this.kills += 5;
         this.enemiesAlive--;
         
-        this.goldText.setText(`${GameConfig.emojis.gold} +${this.goldEarned}`);
-        this.killsText.setText(`${GameConfig.text.kills}: ${this.totalKills}`);
+        this.killText.setText(`Kills: ${this.kills}`);
+        this.gainXP(100);
         
-        // Massive death particles
         for (let i = 0; i < 16; i++) {
             const particle = this.add.circle(boss.x, boss.y, 5, 0xff0000);
             const angle = (Math.PI * 2 * i) / 16;
@@ -834,6 +992,22 @@ class BattleScene extends Phaser.Scene {
                 onComplete: () => particle.destroy()
             });
         }
+        
+        const text = this.add.text(boss.x, boss.y, '💀 BOSS DEFEATED! 💀', {
+            fontSize: '32px',
+            color: '#ff0000',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+            targets: text,
+            y: text.y - 80,
+            alpha: 0,
+            duration: 2000,
+            onComplete: () => text.destroy()
+        });
         
         boss.destroy();
     }
@@ -852,11 +1026,41 @@ class BattleScene extends Phaser.Scene {
     collectPowerup(powerup) {
         const type = powerup.getData('type');
         
-        if (type === 'heal') {
-            const heroData = gameData.data.hero;
-            heroData.hp = heroData.maxHp;
-            this.player.setData('hp', heroData.maxHp);
+        const text = this.add.text(powerup.x, powerup.y - 20, '', {
+            fontSize: '20px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        if (type === 'speed') {
+            text.setText('⚡ SPEED BOOST!');
+            const old = this.heroStats.speed;
+            this.heroStats.speed *= 1.5;
+            this.time.delayedCall(8000, () => { this.heroStats.speed = old; });
+        } else if (type === 'damage') {
+            text.setText('💪 DAMAGE BOOST!');
+            const old = this.heroStats.damage;
+            this.heroStats.damage *= 2;
+            this.player.setData('damage', this.heroStats.damage);
+            this.time.delayedCall(8000, () => {
+                this.heroStats.damage = old;
+                this.player.setData('damage', old);
+            });
+        } else {
+            text.setText('❤️ HEAL!');
+            this.heroStats.hp = this.heroStats.maxHp;
+            this.player.setData('hp', this.heroStats.hp);
         }
+        
+        this.tweens.add({
+            targets: text,
+            y: text.y - 40,
+            alpha: 0,
+            duration: 1500,
+            onComplete: () => text.destroy()
+        });
         
         powerup.destroy();
     }
@@ -913,7 +1117,6 @@ class BattleScene extends Phaser.Scene {
     levelComplete(victory) {
         this.isLevelComplete = true;
         
-        // Stop everything
         if (this.player) this.player.setVelocity(0, 0);
         this.allies.children.entries.forEach(ally => ally.setVelocity(0, 0));
         this.mobs.children.entries.forEach(mob => mob.setVelocity(0, 0));
@@ -942,15 +1145,15 @@ class BattleScene extends Phaser.Scene {
             strokeThickness: 8
         }).setOrigin(0.5).setScrollFactor(0).setDepth(3001);
         
-        this.add.text(width / 2, height / 2, `Kills: ${this.totalKills}\nGold Earned: ${this.goldEarned}`, {
-            fontSize: '32px',
+        this.add.text(width / 2, height / 2, `Kills: ${this.kills}\nGold Earned: ${this.goldEarned}\nArmy Size: ${this.allies.children.entries.length + 1}`, {
+            fontSize: '28px',
             color: '#ffffff',
             align: 'center',
             stroke: '#000000',
             strokeThickness: 4
         }).setOrigin(0.5).setScrollFactor(0).setDepth(3001);
         
-        this.createButton(width / 2, height / 2 + 100, 'Continue →', () => {
+        this.createButton(width / 2, height / 2 + 120, 'Continue →', () => {
             this.scene.start('CastleScene');
         });
     }
