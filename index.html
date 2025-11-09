@@ -133,12 +133,8 @@ async function connectToMultiplayer() {
             }
             
             // Sync other players
-            for (let sessionId in state.players) {
-                // Skip MapSchema internal properties
-                if (sessionId.startsWith('$')) continue;
-                if (sessionId === myPlayerId) continue;
-                
-                const serverPlayer = state.players[sessionId];
+            state.players.forEach((serverPlayer, sessionId) => {
+                if (sessionId === myPlayerId) return; // Skip our own player
                 
                 // Create sprite for new player
                 if (!otherPlayers[sessionId]) {
@@ -168,7 +164,7 @@ async function connectToMultiplayer() {
                         sprite.setData('hp', serverPlayer.hp);
                     }
                 }
-            }
+            });
             
             // Remove disconnected players
             for (let sessionId in otherPlayers) {
