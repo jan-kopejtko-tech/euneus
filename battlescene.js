@@ -33,6 +33,72 @@ class BattleScene extends Phaser.Scene {
         this.load.image('powerup-speed', `${basePath}/UI/Icons/Regular_01.png`);
         this.load.image('powerup-damage', `${basePath}/UI/Icons/Regular_02.png`);
         this.load.image('powerup-heal', `${basePath}/UI/Icons/Regular_03.png`);
+        
+        // UI Assets - Buttons and Panels
+        this.load.image('btn-blue', `${basePath}/UI/Buttons/Button_Blue.png`);
+        this.load.image('btn-blue-hover', `${basePath}/UI/Buttons/Button_Hover.png`);
+        this.load.image('btn-blue-pressed', `${basePath}/UI/Buttons/Button_Blue_Pressed.png`);
+        this.load.image('btn-red', `${basePath}/UI/Buttons/Button_Red.png`);
+        this.load.image('btn-red-pressed', `${basePath}/UI/Buttons/Button_Red_Pressed.png`);
+        this.load.image('btn-disable', `${basePath}/UI/Buttons/Button_Disable.png`);
+        
+        // Banners and Panels
+        this.load.image('banner-h', `${basePath}/UI/Banners/Banner_Horizontal.png`);
+        this.load.image('banner-v', `${basePath}/UI/Banners/Banner_Vertical.png`);
+        this.load.image('panel-carved', `${basePath}/UI/Banners/Carved_9Slides.png`);
+        
+        // Effects - Explosions and Fire
+        this.load.spritesheet('explosion', `${basePath}/Effects/Explosion/Explosions.png`, 
+            { frameWidth: 32, frameHeight: 32 });
+        this.load.spritesheet('fire', `${basePath}/Effects/Fire/Fire.png`,
+            { frameWidth: 16, frameHeight: 16 });
+        
+        // Buildings
+        this.load.image('castle-sprite', `${basePath}/Factions/Knights/Buildings/Castle/Castle_Blue.png`);
+        this.load.image('tower-sprite', `${basePath}/Factions/Knights/Buildings/Tower/Tower_Blue.png`);
+        this.load.image('house-sprite', `${basePath}/Factions/Knights/Buildings/House/House_Blue.png`);
+        
+        // Decorations
+        this.load.image('tree', `${basePath}/Resources/Trees/Tree.png`);
+        
+        // Dead sprite
+        this.load.spritesheet('dead-sprite', `${basePath}/Factions/Knights/Troops/Dead/Dead.png`,
+            { frameWidth: 192, frameHeight: 192 });
+        
+        // Arrow projectile
+        this.load.image('arrow-sprite', `${basePath}/Factions/Knights/Troops/Archer/Arrow/Arrow.png`);
+        
+        // TERRAIN ASSETS - Complete environment!
+        this.load.image('ground-tiles', `${basePath}/Terrain/Ground/Tilemap_Flat.png`);
+        this.load.image('shadows', `${basePath}/Terrain/Ground/Shadows.png`);
+        this.load.image('water', `${basePath}/Terrain/Water/Water.png`);
+        this.load.spritesheet('foam', `${basePath}/Terrain/Water/Foam/Foam.png`, 
+            { frameWidth: 32, frameHeight: 32 });
+        
+        // Water rocks
+        this.load.image('rock1', `${basePath}/Terrain/Water/Rocks/Rocks_01.png`);
+        this.load.image('rock2', `${basePath}/Terrain/Water/Rocks/Rocks_02.png`);
+        this.load.image('rock3', `${basePath}/Terrain/Water/Rocks/Rocks_03.png`);
+        this.load.image('rock4', `${basePath}/Terrain/Water/Rocks/Rocks_04.png`);
+        
+        // Bridge
+        this.load.image('bridge', `${basePath}/Terrain/Bridge/Bridge_All.png`);
+        
+        // Decorations (all 18!)
+        for (let i = 1; i <= 18; i++) {
+            const num = i.toString().padStart(2, '0');
+            this.load.image(`deco${i}`, `${basePath}/Deco/${num}.png`);
+        }
+        
+        // Resources - Trees and ambient life
+        this.load.image('tree', `${basePath}/Resources/Trees/Tree.png`);
+        this.load.spritesheet('sheep', `${basePath}/Resources/Sheep/HappySheep_All.png`,
+            { frameWidth: 44, frameHeight: 44 });
+        
+        // Resource piles (gold, metal, wood)
+        this.load.image('gold-pile', `${basePath}/Resources/Resources/G_Idle.png`);
+        this.load.image('metal-pile', `${basePath}/Resources/Resources/M_Idle.png`);
+        this.load.image('wood-pile', `${basePath}/Resources/Resources/W_Idle.png`);
     }
     
     createAnimations() {
@@ -121,6 +187,45 @@ class BattleScene extends Phaser.Scene {
             }
             
             console.log(`  ✓ ${type}: ${frameCount + 1} frames available`);
+        });
+        
+        // EXPLOSION animation
+        this.anims.create({
+            key: 'explode',
+            frames: this.anims.generateFrameNumbers('explosion', { start: 0, end: 7 }),
+            frameRate: 16,
+            repeat: 0
+        });
+        
+        // FIRE animation  
+        this.anims.create({
+            key: 'burn',
+            frames: this.anims.generateFrameNumbers('fire', { start: 0, end: 5 }),
+            frameRate: 12,
+            repeat: -1
+        });
+        
+        // FOAM animation (water)
+        this.anims.create({
+            key: 'foam-wave',
+            frames: this.anims.generateFrameNumbers('foam', { start: 0, end: 7 }),
+            frameRate: 8,
+            repeat: -1
+        });
+        
+        // SHEEP animation (ambient life)
+        this.anims.create({
+            key: 'sheep-idle',
+            frames: this.anims.generateFrameNumbers('sheep', { start: 0, end: 3 }),
+            frameRate: 6,
+            repeat: -1
+        });
+        
+        this.anims.create({
+            key: 'sheep-bounce',
+            frames: this.anims.generateFrameNumbers('sheep', { start: 4, end: 9 }),
+            frameRate: 10,
+            repeat: -1
         });
         
         console.log('✅ Animations created!');
@@ -294,8 +399,6 @@ class BattleScene extends Phaser.Scene {
             ease: 'Cubic.easeOut',
             onComplete: () => wave.destroy()
         });
-        
-        this.screenShake(0.01, 200);
     }
     
     levelUpEffect(x, y) {
@@ -308,18 +411,22 @@ class BattleScene extends Phaser.Scene {
         });
         
         this.goldEmitter.explode(50, x, y);
-        this.screenFlash(0xffd700, 0.5, 200);
-        this.screenShake(0.02, 300);
     }
     
     deathExplosion(x, y, isBoss = false) {
-        const shakeIntensity = isBoss ? 0.02 : 0.008;
         const flashColor = isBoss ? 0xff0000 : 0xff6600;
         
-        this.emitBlood(x, y, isBoss ? 30 : 15);
+        // Use actual explosion sprite!
+        const explosionSprite = this.add.sprite(x, y, 'explosion');
+        explosionSprite.setScale(isBoss ? 3 : 2);
+        explosionSprite.play('explode');
+        explosionSprite.once('animationcomplete', () => {
+            explosionSprite.destroy();
+        });
+        
+        // Still add some blood particles for extra juice
+        this.emitBlood(x, y, isBoss ? 20 : 10);
         this.shockwave(x, y, flashColor, isBoss ? 400 : 200);
-        this.screenFlash(flashColor, 0.3, 100);
-        this.screenShake(shakeIntensity, 300);
     }
     
     powerupCollectionEffect(x, y, type) {
@@ -333,7 +440,6 @@ class BattleScene extends Phaser.Scene {
         
         this.energyRing(x, y, color, 100);
         this.emitGold(x, y, 20);
-        this.screenFlash(color, 0.2, 100);
     }
     
     create() {
@@ -384,14 +490,17 @@ class BattleScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
         this.cameras.main.setZoom(0.7);
         
-        // Background
-        this.add.rectangle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 0x2d5016);
+        // Background - neutral to let ground tiles show
+        this.add.rectangle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 0x5a7c3e);
         
         // Create textures
         this.createAllTextures();
         
         // Create castle
         this.createCastle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+        
+        // Add environment decorations
+        this.createEnvironment(WORLD_WIDTH, WORLD_HEIGHT);
         
         // Create player
         this.createPlayer(WORLD_WIDTH / 2 - 100, WORLD_HEIGHT / 2);
@@ -515,14 +624,308 @@ class BattleScene extends Phaser.Scene {
     }
     
     createCastle(x, y) {
-        this.add.text(x, y, GameConfig.emojis.castle, {
-            fontSize: '100px'
-        }).setOrigin(0.5);
+        // Use actual castle sprite instead of emoji!
+        this.castleSprite = this.add.image(x, y, 'castle-sprite');
+        this.castleSprite.setScale(2);
         
         this.castle = { x: x, y: y, hp: 1000, maxHp: 1000 };
         
+        // Add protective circle
         this.add.circle(x, y, 250, 0xffd700, 0.05)
             .setStrokeStyle(2, 0xffd700, 0.2);
+    }
+    
+    createEnvironment(worldWidth, worldHeight) {
+        const centerX = worldWidth / 2;
+        const centerY = worldHeight / 2;
+        const castleSafeZone = 500; // Keep area around castle clear
+        
+        console.log('🌍 Creating beautiful terrain...');
+        
+        // 1. GROUND TILES - Create tiled ground texture
+        this.createGroundTiles(worldWidth, worldHeight);
+        
+        // 2. WATER MOAT - Around the castle (but with gaps)
+        this.createWaterMoat(centerX, centerY);
+        
+        // 3. TREES - Dense forest around edges
+        this.createTrees(worldWidth, worldHeight, centerX, centerY, castleSafeZone);
+        
+        // 4. ROCKS - Near water and scattered
+        this.createRocks(worldWidth, worldHeight, centerX, centerY, castleSafeZone);
+        
+        // 5. DECORATIONS - All 18 deco sprites scattered
+        this.createDecorations(worldWidth, worldHeight, centerX, centerY, castleSafeZone);
+        
+        // 6. RESOURCE PILES - Gold, metal, wood
+        this.createResourcePiles(worldWidth, worldHeight, centerX, centerY, castleSafeZone);
+        
+        // 7. SHEEP - Ambient life
+        this.createSheep(worldWidth, worldHeight, centerX, centerY, castleSafeZone);
+        
+        console.log('✅ Terrain created!');
+    }
+    
+    createGroundTiles(worldWidth, worldHeight) {
+        // Create repeating ground texture using TileSprite for better performance
+        if (this.textures.exists('ground-tiles')) {
+            const ground = this.add.tileSprite(0, 0, worldWidth, worldHeight, 'ground-tiles');
+            ground.setOrigin(0, 0);
+            ground.setDepth(-100);
+            ground.setAlpha(0.9);
+            console.log('✅ Ground tiles loaded');
+        } else {
+            console.warn('⚠️ Ground tiles not found, using pattern');
+            // Checkered ground pattern as fallback
+            const tileSize = 128;
+            for (let x = 0; x < worldWidth; x += tileSize) {
+                for (let y = 0; y < worldHeight; y += tileSize) {
+                    const isEven = (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 2 === 0;
+                    const color = isEven ? 0x6b8e3d : 0x5a7c3e;
+                    const rect = this.add.rectangle(x + tileSize/2, y + tileSize/2, tileSize, tileSize, color);
+                    rect.setDepth(-100);
+                }
+            }
+        }
+    }
+    
+    createWaterMoat(centerX, centerY) {
+        // Create water moat around castle in a circle (but not complete)
+        const moatRadius = 350;
+        const waterTiles = [];
+        
+        // Create water patches around castle
+        const waterSections = [
+            { startAngle: 0, endAngle: 60 },      // Top right
+            { startAngle: 90, endAngle: 150 },    // Right
+            { startAngle: 180, endAngle: 240 },   // Bottom
+            { startAngle: 270, endAngle: 330 }    // Left
+        ];
+        
+        waterSections.forEach(section => {
+            for (let angle = section.startAngle; angle < section.endAngle; angle += 15) {
+                const rad = (angle * Math.PI) / 180;
+                const x = centerX + Math.cos(rad) * moatRadius;
+                const y = centerY + Math.sin(rad) * moatRadius;
+                
+                // Add water tile
+                const water = this.add.image(x, y, 'water');
+                water.setScale(2);
+                water.setDepth(-50);
+                water.setAlpha(0.7);
+                waterTiles.push(water);
+                
+                // Add animated foam
+                if (Math.random() < 0.3) {
+                    const foam = this.add.sprite(x + Phaser.Math.Between(-20, 20), 
+                                                  y + Phaser.Math.Between(-20, 20), 
+                                                  'foam');
+                    foam.setScale(1.5);
+                    foam.setDepth(-49);
+                    foam.play('foam-wave');
+                }
+            }
+        });
+        
+        console.log(`  💧 Created water moat with ${waterTiles.length} tiles`);
+    }
+    
+    createTrees(worldWidth, worldHeight, centerX, centerY, safeZone) {
+        const numTrees = 60;
+        let treesPlaced = 0;
+        
+        for (let i = 0; i < numTrees; i++) {
+            let x = Phaser.Math.Between(100, worldWidth - 100);
+            let y = Phaser.Math.Between(100, worldHeight - 100);
+            
+            const distToCenter = Phaser.Math.Distance.Between(x, y, centerX, centerY);
+            
+            // Only place if outside safe zone
+            if (distToCenter > safeZone) {
+                if (this.textures.exists('tree')) {
+                    const tree = this.add.image(x, y, 'tree');
+                    tree.setScale(Phaser.Math.FloatBetween(1.2, 2.0));
+                    tree.setDepth(y);
+                } else {
+                    // Fallback tree visualization
+                    const tree = this.add.circle(x, y, 30, 0x2d7010);
+                    tree.setDepth(y);
+                    const trunk = this.add.rectangle(x, y + 20, 12, 25, 0x4a3020);
+                    trunk.setDepth(y);
+                }
+                treesPlaced++;
+            }
+        }
+        
+        console.log(`  🌳 Placed ${treesPlaced} trees`);
+    }
+    
+    createRocks(worldWidth, worldHeight, centerX, centerY, safeZone) {
+        const numRocks = 30;
+        let rocksPlaced = 0;
+        
+        for (let i = 0; i < numRocks; i++) {
+            let x = Phaser.Math.Between(50, worldWidth - 50);
+            let y = Phaser.Math.Between(50, worldHeight - 50);
+            
+            const distToCenter = Phaser.Math.Distance.Between(x, y, centerX, centerY);
+            
+            if (distToCenter > safeZone) {
+                const rockType = Phaser.Math.Between(1, 4);
+                if (this.textures.exists(`rock${rockType}`)) {
+                    const rock = this.add.image(x, y, `rock${rockType}`);
+                    rock.setScale(Phaser.Math.FloatBetween(1.0, 1.8));
+                    rock.setDepth(y - 100);
+                } else {
+                    // Fallback rocks
+                    const rock = this.add.circle(x, y, Phaser.Math.Between(15, 25), 0x6b6b6b);
+                    rock.setDepth(y - 100);
+                }
+                rocksPlaced++;
+            }
+        }
+        
+        console.log(`  🪨 Placed ${rocksPlaced} rocks`);
+    }
+    
+    createDecorations(worldWidth, worldHeight, centerX, centerY, safeZone) {
+        const numDecos = 40; // Use ALL 18 deco types!
+        let decosPlaced = 0;
+        
+        for (let i = 0; i < numDecos; i++) {
+            let x, y;
+            let attempts = 0;
+            
+            do {
+                x = Phaser.Math.Between(100, worldWidth - 100);
+                y = Phaser.Math.Between(100, worldHeight - 100);
+                attempts++;
+            } while (
+                (Phaser.Math.Distance.Between(x, y, centerX, centerY) < safeZone) &&
+                attempts < 10
+            );
+            
+            if (attempts < 10) {
+                const decoType = Phaser.Math.Between(1, 18);
+                if (this.textures.exists(`deco${decoType}`)) {
+                    const deco = this.add.image(x, y, `deco${decoType}`);
+                    deco.setScale(Phaser.Math.FloatBetween(0.8, 1.3));
+                    deco.setDepth(-8);
+                } else {
+                    // Fallback decorations - colorful shapes
+                    const colors = [0xffaa00, 0xff6b6b, 0x4dabf7, 0xa78bfa, 0x00ff88];
+                    const shapes = ['circle', 'triangle', 'square'];
+                    const shape = shapes[decoType % 3];
+                    const size = Phaser.Math.Between(10, 20);
+                    const color = colors[decoType % colors.length];
+                    
+                    if (shape === 'circle') {
+                        const obj = this.add.circle(x, y, size, color);
+                        obj.setDepth(-8);
+                    } else {
+                        const obj = this.add.rectangle(x, y, size * 2, size * 2, color);
+                        obj.setDepth(-8);
+                    }
+                }
+                decosPlaced++;
+            }
+        }
+        
+        console.log(`  🎨 Placed ${decosPlaced} decorations`);
+    }
+    
+    createResourcePiles(worldWidth, worldHeight, centerX, centerY, safeZone) {
+        // Add some resource piles (gold, metal, wood) scattered around
+        const resources = [
+            { type: 'gold-pile', count: 8 },
+            { type: 'metal-pile', count: 6 },
+            { type: 'wood-pile', count: 6 }
+        ];
+        
+        let totalPlaced = 0;
+        
+        resources.forEach(resource => {
+            for (let i = 0; i < resource.count; i++) {
+                let x, y;
+                let attempts = 0;
+                
+                do {
+                    x = Phaser.Math.Between(200, worldWidth - 200);
+                    y = Phaser.Math.Between(200, worldHeight - 200);
+                    attempts++;
+                } while (
+                    (Phaser.Math.Distance.Between(x, y, centerX, centerY) < safeZone) &&
+                    attempts < 10
+                );
+                
+                if (attempts < 10) {
+                    const pile = this.add.image(x, y, resource.type);
+                    pile.setScale(1.2);
+                    pile.setDepth(-6);
+                    
+                    // Add glow for gold
+                    if (resource.type === 'gold-pile') {
+                        const glow = this.add.circle(x, y, 20, 0xffd700, 0.2);
+                        glow.setDepth(-7);
+                    }
+                    
+                    totalPlaced++;
+                }
+            }
+        });
+        
+        console.log(`  💎 Placed ${totalPlaced} resource piles`);
+    }
+    
+    createSheep(worldWidth, worldHeight, centerX, centerY, safeZone) {
+        const numSheep = 12;
+        let sheepPlaced = 0;
+        
+        for (let i = 0; i < numSheep; i++) {
+            let x, y;
+            let attempts = 0;
+            
+            do {
+                x = Phaser.Math.Between(200, worldWidth - 200);
+                y = Phaser.Math.Between(200, worldHeight - 200);
+                attempts++;
+            } while (
+                (Phaser.Math.Distance.Between(x, y, centerX, centerY) < safeZone) &&
+                attempts < 10
+            );
+            
+            if (attempts < 10) {
+                const sheep = this.add.sprite(x, y, 'sheep');
+                sheep.setScale(1.5);
+                sheep.setDepth(-7);
+                
+                // Random animation
+                const anim = Math.random() < 0.7 ? 'sheep-idle' : 'sheep-bounce';
+                sheep.play(anim);
+                
+                // Make sheep wander occasionally
+                this.time.addEvent({
+                    delay: Phaser.Math.Between(3000, 8000),
+                    callback: () => {
+                        if (sheep && sheep.active) {
+                            // Small random movement
+                            this.tweens.add({
+                                targets: sheep,
+                                x: sheep.x + Phaser.Math.Between(-50, 50),
+                                y: sheep.y + Phaser.Math.Between(-50, 50),
+                                duration: 2000,
+                                ease: 'Sine.easeInOut'
+                            });
+                        }
+                    },
+                    loop: true
+                });
+                
+                sheepPlaced++;
+            }
+        }
+        
+        console.log(`  🐑 Placed ${sheepPlaced} sheep`);
     }
     
     createPlayer(x, y) {
@@ -835,7 +1238,6 @@ class BattleScene extends Phaser.Scene {
         
         // Cool effects!
         this.energyRing(this.player.x, this.player.y, 0x00ffff, 80);
-        this.screenShake(0.005, 100);
         
         const trail = this.add.circle(this.player.x, this.player.y, 40, 0xffd700, 0.5);
         this.tweens.add({
@@ -863,8 +1265,6 @@ class BattleScene extends Phaser.Scene {
         
         // EPIC AOE EFFECTS!
         this.shockwave(this.player.x, this.player.y, 0xff0000, range);
-        this.screenFlash(0xff0000, 0.3, 100);
-        this.screenShake(0.015, 200);
         this.emitBlood(this.player.x, this.player.y, 30);
         
         const aoeCircle = this.add.circle(this.player.x, this.player.y, range, 0xff0000, 0.3);
@@ -1280,9 +1680,6 @@ class BattleScene extends Phaser.Scene {
         // Damage text
         this.showDamageText(mob.x, mob.y - 20, Math.round(actualDamage), isCrit);
         
-        // Small screen shake on hit
-        this.screenShake(0.003, 50);
-        
         if (hp <= 0) {
             this.killMob(mob);
         }
@@ -1304,9 +1701,6 @@ class BattleScene extends Phaser.Scene {
         
         // Bigger damage text
         this.showDamageText(boss.x, boss.y - 30, Math.round(damage), false);
-        
-        // BIGGER screen shake
-        this.screenShake(0.008, 100);
         
         if (hp <= 0) {
             this.killBoss(boss);
