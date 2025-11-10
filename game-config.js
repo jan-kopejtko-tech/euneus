@@ -18,7 +18,7 @@ const GameConfig = {
     classes: {
         tank: {
             name: 'Knight',
-            icon: '🛡️',
+            icon: 'ðŸ›¡ï¸',
             maxHp: 150,
             damage: 15,
             speed: 180,
@@ -28,7 +28,7 @@ const GameConfig = {
         },
         assassin: {
             name: 'Rogue',
-            icon: '🗡️',
+            icon: 'ðŸ—¡ï¸',
             maxHp: 80,
             damage: 30,
             speed: 280,
@@ -38,7 +38,7 @@ const GameConfig = {
         },
         mage: {
             name: 'Wizard',
-            icon: '🧙',
+            icon: 'ðŸ§™',
             maxHp: 100,
             damage: 25,
             speed: 220,
@@ -52,14 +52,14 @@ const GameConfig = {
     buildings: {
         wall: {
             name: 'Wall',
-            icon: '🧱',
+            icon: 'ðŸ§±',
             cost: 100,
             hp: 500,
             description: 'Basic defensive wall'
         },
         tower: {
             name: 'Archer Tower',
-            icon: '🗼',
+            icon: 'ðŸ—¼',
             cost: 300,
             hp: 300,
             damage: 10,
@@ -69,27 +69,27 @@ const GameConfig = {
         },
         gate: {
             name: 'Gate',
-            icon: '🚪',
+            icon: 'ðŸšª',
             cost: 200,
             hp: 400,
             description: 'Reinforced castle gate'
         },
         moat: {
             name: 'Moat',
-            icon: '🌊',
+            icon: 'ðŸŒŠ',
             cost: 500,
             slowAmount: 0.5,
             description: 'Slows enemy movement'
         },
         barracks: {
             name: 'Barracks',
-            icon: '🏰',
+            icon: 'ðŸ°',
             cost: 400,
             description: 'Spawns knights periodically'
         },
         peasant: {
             name: 'Peasant',
-            icon: '👨‍🌾',
+            icon: 'ðŸ‘¨â€ðŸŒ¾',
             cost: 50,
             goldPerSecond: 2,
             description: 'Generates passive gold'
@@ -99,7 +99,7 @@ const GameConfig = {
     // Units
     units: {
         knight: {
-            icon: '⚔️',
+            icon: 'âš”ï¸',
             hp: 10,
             damage: 5,
             speed: 220,
@@ -107,7 +107,7 @@ const GameConfig = {
             attackSpeed: 550
         },
         archer: {
-            icon: '🏹',
+            icon: 'ðŸ¹',
             hp: 5,
             damage: 2.5,
             speed: 210,
@@ -119,7 +119,7 @@ const GameConfig = {
     // Enemies (mobs)
     enemies: {
         goblin: {
-            icon: '👹',
+            icon: 'ðŸ‘¹',
             hp: 30,
             damage: 5,
             speed: 100,
@@ -128,7 +128,7 @@ const GameConfig = {
             goldReward: 10
         },
         orc: {
-            icon: '👺',
+            icon: 'ðŸ‘º',
             hp: 50,
             damage: 10,
             speed: 80,
@@ -137,7 +137,7 @@ const GameConfig = {
             goldReward: 20
         },
         troll: {
-            icon: '🧟',
+            icon: 'ðŸ§Ÿ',
             hp: 100,
             damage: 15,
             speed: 60,
@@ -146,7 +146,7 @@ const GameConfig = {
             goldReward: 50
         },
         dragon: {
-            icon: '🐉',
+            icon: 'ðŸ‰',
             hp: 300,
             damage: 30,
             speed: 120,
@@ -235,9 +235,10 @@ const GameConfig = {
     ],
     
     // Abilities
+    // Abilities
     abilities: {
         dash: {
-            key: 'Q',
+            keys: ['W', 'A', 'S', 'D'],
             emoji: '💨',
             cooldown: 5000,
             distance: 200
@@ -248,6 +249,94 @@ const GameConfig = {
             cooldown: 8000,
             range: 200,
             damageMultiplier: 2
+        },
+        attack: {
+            key: 'LEFT_CLICK',
+            emoji: '⚔️',
+            cooldown: 400,
+            range: 120,  // Increased from 80
+            arc: Math.PI / 2.5  // Wider arc (72 degrees instead of 60)
+        }
+    },
+    
+    // Level-up Upgrades (Hades-style)
+    upgrades: {
+        damage1: {
+            name: '+5 Damage',
+            icon: '⚔️',
+            description: 'Increase attack damage',
+            effect: { stat: 'damage', value: 5 }
+        },
+        damage2: {
+            name: '+10 Damage',
+            icon: '🗡️',
+            description: 'Major damage boost',
+            effect: { stat: 'damage', value: 10 },
+            rarity: 'rare'
+        },
+        hp1: {
+            name: '+20 Max HP',
+            icon: '❤️',
+            description: 'Increase maximum health',
+            effect: { stat: 'maxHp', value: 20 }
+        },
+        hp2: {
+            name: '+50 Max HP',
+            icon: '💖',
+            description: 'Major health boost',
+            effect: { stat: 'maxHp', value: 50 },
+            rarity: 'rare'
+        },
+        speed1: {
+            name: '+20 Speed',
+            icon: '💨',
+            description: 'Move faster',
+            effect: { stat: 'speed', value: 20 }
+        },
+        range1: {
+            name: '+15 Range',
+            icon: '🎯',
+            description: 'Increase attack range',
+            effect: { stat: 'range', value: 15 }
+        },
+        heal: {
+            name: 'Full Heal',
+            icon: '💚',
+            description: 'Restore all health',
+            effect: { stat: 'heal', value: 'full' }
+        },
+        crit: {
+            name: 'Critical Strikes',
+            icon: '⚡',
+            description: '15% chance for double damage',
+            effect: { stat: 'crit', value: 0.15 },
+            rarity: 'rare'
+        },
+        attackSpeed: {
+            name: 'Swift Strikes',
+            icon: '🌪️',
+            description: 'Reduce attack cooldown by 100ms',
+            effect: { stat: 'attackSpeed', value: -100 }
+        },
+        dashCooldown: {
+            name: 'Agile Dash',
+            icon: '🏃',
+            description: 'Reduce dash cooldown by 1s',
+            effect: { stat: 'dashCooldown', value: -1000 }
+        },
+        aoe: {
+            name: 'Explosive Power',
+            icon: '💥',
+            description: 'AOE deals 50% more damage',
+            effect: { stat: 'aoeDamage', value: 0.5 },
+            rarity: 'rare'
+        },
+        lifesteal: {
+            name: 'Vampiric',
+            icon: '🩸',
+            description: 'Heal 10% of damage dealt',
+            effect: { stat: 'lifesteal', value: 0.1 },
+            rarity: 'rare'
         }
     },
     
@@ -301,26 +390,27 @@ const GameConfig = {
         rangeShort: 'Short',
         
         // Abilities
-        abilityDash: 'Q - Dash Forward',
-        abilityAOE: 'E - Area Attack'
+        abilityDash: 'WASD - Directional Dash',
+        abilityAOE: 'E - Area Attack',
+        abilityAttack: 'LEFT CLICK - Sword Slash'
     },
     
     // Emojis
     emojis: {
-        player: '🤴',
-        knight: '⚔️',
-        archer: '🏹',
-        goblin: '👹',
-        orc: '👺',
-        troll: '🧟',
-        dragon: '🐉',
-        castle: '🏰',
-        wall: '🧱',
-        tower: '🗼',
-        gate: '🚪',
-        moat: '🌊',
-        peasant: '👨‍🌾',
-        gold: '💰'
+        player: 'ðŸ¤´',
+        knight: 'âš”ï¸',
+        archer: 'ðŸ¹',
+        goblin: 'ðŸ‘¹',
+        orc: 'ðŸ‘º',
+        troll: 'ðŸ§Ÿ',
+        dragon: 'ðŸ‰',
+        castle: 'ðŸ°',
+        wall: 'ðŸ§±',
+        tower: 'ðŸ—¼',
+        gate: 'ðŸšª',
+        moat: 'ðŸŒŠ',
+        peasant: 'ðŸ‘¨â€ðŸŒ¾',
+        gold: 'ðŸ’°'
     }
 };
 

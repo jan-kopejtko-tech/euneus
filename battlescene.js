@@ -102,7 +102,7 @@ class BattleScene extends Phaser.Scene {
     }
     
     createAnimations() {
-        console.log('🎨 Creating sprite animations...');
+        console.log('Ã°Å¸Å½Â¨ Creating sprite animations...');
         
         const spriteTypes = ['player', 'knight', 'archer', 'goblin', 'orc', 'troll', 'dragon'];
         
@@ -186,7 +186,7 @@ class BattleScene extends Phaser.Scene {
                 });
             }
             
-            console.log(`  ✓ ${type}: ${frameCount + 1} frames available`);
+            console.log(`  Ã¢Å“â€œ ${type}: ${frameCount + 1} frames available`);
         });
         
         // EXPLOSION animation
@@ -228,7 +228,7 @@ class BattleScene extends Phaser.Scene {
             repeat: -1
         });
         
-        console.log('✅ Animations created!');
+        console.log('Ã¢Å“â€¦ Animations created!');
     }
     
     updateSpriteAnimation(sprite, isMoving, isAttacking) {
@@ -273,7 +273,7 @@ class BattleScene extends Phaser.Scene {
     }
     
     createParticleSystems() {
-        console.log('✨ Creating particle systems...');
+        console.log('Ã¢Å“Â¨ Creating particle systems...');
         
         // Phaser 3.70 uses new particle system API
         // Blood particles (red)
@@ -310,7 +310,7 @@ class BattleScene extends Phaser.Scene {
             emitting: false
         });
         
-        console.log('✅ Particle systems ready!');
+        console.log('Ã¢Å“â€¦ Particle systems ready!');
     }
     
     screenShake(intensity = 0.01, duration = 200) {
@@ -443,7 +443,7 @@ class BattleScene extends Phaser.Scene {
     }
     
     create() {
-        console.log('Ã°Å¸Å½Â® Battle Scene Started - FULL VERSION');
+        console.log('ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â® Battle Scene Started - FULL VERSION');
         
         // Create all animations first
         this.createAnimations();
@@ -479,7 +479,8 @@ class BattleScene extends Phaser.Scene {
         // Abilities
         this.abilities = {
             dash: { cooldown: GameConfig.abilities.dash.cooldown, lastUsed: 0 },
-            aoe: { cooldown: GameConfig.abilities.aoe.cooldown, lastUsed: 0 }
+            aoe: { cooldown: GameConfig.abilities.aoe.cooldown, lastUsed: 0 },
+            attack: { cooldown: GameConfig.abilities.attack.cooldown, lastUsed: 0 }
         };
         
         // World setup
@@ -541,65 +542,117 @@ class BattleScene extends Phaser.Scene {
     }
     
     showHeroHUD() {
-        const hud = document.getElementById('hero-hud');
-        if (!hud) return;
+        // Hide old top-left HUD
+        const oldHud = document.getElementById('hero-hud');
+        if (oldHud) {
+            oldHud.style.display = 'none';
+        }
         
-        hud.style.display = 'block';
+        // Show Diablo-style action bar
+        const actionBar = document.getElementById('diablo-action-bar');
+        if (!actionBar) return;
+        
+        actionBar.style.display = 'block';
         
         // Set hero icon and class
         const heroClass = gameData.data.hero.class;
         const classConfig = GameConfig.classes[heroClass];
         
-        document.getElementById('hero-icon').textContent = classConfig.icon;
-        document.getElementById('hero-class').textContent = classConfig.name.toUpperCase();
-        document.getElementById('hero-level').textContent = `Level ${this.heroStats.level}`;
+        document.getElementById('portrait-icon').textContent = classConfig.icon;
+        document.getElementById('portrait-level').textContent = `Level ${this.heroStats.level}`;
         
         // Set initial stats
         this.updateHeroHUD();
+        
+        // Setup menu button clicks
+        document.getElementById('btn-character').onclick = () => this.openCharacterSheet();
+        document.getElementById('btn-skills').onclick = () => this.openSkillTree();
+        document.getElementById('btn-inventory').onclick = () => this.openInventory();
+        
+        // Setup portrait click
+        document.getElementById('action-portrait').onclick = () => this.openCharacterSheet();
     }
     
     updateHeroHUD() {
-        // Update HP
-        document.getElementById('hp-text').textContent = `${Math.round(this.heroStats.hp)}/${this.heroStats.maxHp}`;
-        document.getElementById('hp-bar').style.width = `${(this.heroStats.hp / this.heroStats.maxHp) * 100}%`;
+        // Update HP Globe
+        const hpPercent = (this.heroStats.hp / this.heroStats.maxHp) * 100;
+        document.getElementById('hp-globe-fill').style.height = `${hpPercent}%`;
+        document.getElementById('hp-globe-text').textContent = `${Math.round(this.heroStats.hp)}/${this.heroStats.maxHp}`;
         
-        // Update XP
-        document.getElementById('xp-text').textContent = `${this.heroStats.xp}/${this.heroStats.xpToNext}`;
-        document.getElementById('xp-bar').style.width = `${(this.heroStats.xp / this.heroStats.xpToNext) * 100}%`;
+        // Update Mana Globe (using dash cooldown as "mana")
+        const dashCooldown = this.abilities.dash.cooldown;
+        const timeSinceLastDash = Date.now() - this.abilities.dash.lastUsed;
+        const manaPercent = Math.min(100, (timeSinceLastDash / dashCooldown) * 100);
+        document.getElementById('mana-globe-fill').style.height = `${manaPercent}%`;
+        document.getElementById('mana-globe-text').textContent = manaPercent >= 100 ? 'READY' : `${Math.round((dashCooldown - timeSinceLastDash) / 1000)}s`;
         
-        // Update level
-        document.getElementById('hero-level').textContent = `Level ${this.heroStats.level}`;
-        
-        // Update stats
-        document.getElementById('stat-damage').textContent = this.heroStats.damage;
-        document.getElementById('stat-speed').textContent = this.heroStats.speed;
-        document.getElementById('stat-range').textContent = this.heroStats.range;
-        document.getElementById('stat-army').textContent = this.allies ? this.allies.children.entries.length + 1 : 1;
+        // Update portrait level
+        document.getElementById('portrait-level').textContent = `Level ${this.heroStats.level}`;
     }
     
     startAbilityCooldown(key, cooldownMs) {
-        const ability = document.querySelector(`.ability[data-key="${key}"]`);
-        if (!ability) return;
-        
-        const cooldownDiv = ability.querySelector('.ability-cooldown');
-        let remaining = Math.ceil(cooldownMs / 1000);
-        
-        cooldownDiv.textContent = remaining;
-        cooldownDiv.classList.add('active');
-        
-        const interval = setInterval(() => {
-            remaining--;
-            if (remaining <= 0) {
-                clearInterval(interval);
-                cooldownDiv.classList.remove('active');
-            } else {
+        // Update both old HUD and new action bar
+        const oldAbility = document.querySelector(`#hero-hud .ability[data-key="${key}"]`);
+        if (oldAbility) {
+            const cooldownDiv = oldAbility.querySelector('.ability-cooldown');
+            if (cooldownDiv) {
+                let remaining = Math.ceil(cooldownMs / 1000);
                 cooldownDiv.textContent = remaining;
+                cooldownDiv.classList.add('active');
+                
+                const interval = setInterval(() => {
+                    remaining--;
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        cooldownDiv.classList.remove('active');
+                    } else {
+                        cooldownDiv.textContent = remaining;
+                    }
+                }, 1000);
             }
-        }, 1000);
+        }
+        
+        // Update action bar slot
+        const actionSlot = document.querySelector(`#diablo-action-bar .action-slot[data-key="${key}"]`);
+        if (actionSlot) {
+            const cooldownDiv = actionSlot.querySelector('.action-slot-cooldown');
+            if (cooldownDiv) {
+                let remaining = Math.ceil(cooldownMs / 1000);
+                cooldownDiv.textContent = remaining;
+                cooldownDiv.classList.add('active');
+                
+                const interval = setInterval(() => {
+                    remaining--;
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        cooldownDiv.classList.remove('active');
+                    } else {
+                        cooldownDiv.textContent = remaining;
+                    }
+                }, 1000);
+            }
+        }
     }
     createAllTextures() {
-        // SVG icons are already loaded via preload()
-        // Just create the projectile graphics
+        // Create a BIG impressive slash arc texture
+        const slashGfx = this.add.graphics();
+        
+        // Draw outer white arc (thick line)
+        slashGfx.lineStyle(8, 0xffffff, 1);
+        slashGfx.beginPath();
+        slashGfx.arc(60, 60, 50, -Math.PI / 4, Math.PI / 4);
+        slashGfx.strokePath();
+        
+        // Add inner blue glow (thinner line)
+        slashGfx.lineStyle(4, 0xaaddff, 0.8);
+        slashGfx.beginPath();
+        slashGfx.arc(60, 60, 48, -Math.PI / 4, Math.PI / 4);
+        slashGfx.strokePath();
+        
+        slashGfx.generateTexture('slash', 120, 120);
+        slashGfx.destroy();
+        
+        // Keep old tiny sword for allies
         const swordGfx = this.add.graphics();
         swordGfx.fillStyle(0xffff00, 1);
         swordGfx.fillRect(0, 0, 4, 12);
@@ -640,7 +693,7 @@ class BattleScene extends Phaser.Scene {
         const centerY = worldHeight / 2;
         const castleSafeZone = 500; // Keep area around castle clear
         
-        console.log('🌍 Creating beautiful terrain...');
+        console.log('Ã°Å¸Å’Â Creating beautiful terrain...');
         
         // 1. GROUND TILES - Create tiled ground texture
         this.createGroundTiles(worldWidth, worldHeight);
@@ -663,7 +716,7 @@ class BattleScene extends Phaser.Scene {
         // 7. SHEEP - Ambient life
         this.createSheep(worldWidth, worldHeight, centerX, centerY, castleSafeZone);
         
-        console.log('✅ Terrain created!');
+        console.log('Ã¢Å“â€¦ Terrain created!');
     }
     
     createGroundTiles(worldWidth, worldHeight) {
@@ -673,9 +726,9 @@ class BattleScene extends Phaser.Scene {
             ground.setOrigin(0, 0);
             ground.setDepth(-100);
             ground.setAlpha(0.9);
-            console.log('✅ Ground tiles loaded');
+            console.log('Ã¢Å“â€¦ Ground tiles loaded');
         } else {
-            console.warn('⚠️ Ground tiles not found, using pattern');
+            console.warn('Ã¢Å¡Â Ã¯Â¸Â Ground tiles not found, using pattern');
             // Checkered ground pattern as fallback
             const tileSize = 128;
             for (let x = 0; x < worldWidth; x += tileSize) {
@@ -727,7 +780,7 @@ class BattleScene extends Phaser.Scene {
             }
         });
         
-        console.log(`  💧 Created water moat with ${waterTiles.length} tiles`);
+        console.log(`  Ã°Å¸â€™Â§ Created water moat with ${waterTiles.length} tiles`);
     }
     
     createTrees(worldWidth, worldHeight, centerX, centerY, safeZone) {
@@ -757,7 +810,7 @@ class BattleScene extends Phaser.Scene {
             }
         }
         
-        console.log(`  🌳 Placed ${treesPlaced} trees`);
+        console.log(`  Ã°Å¸Å’Â³ Placed ${treesPlaced} trees`);
     }
     
     createRocks(worldWidth, worldHeight, centerX, centerY, safeZone) {
@@ -785,7 +838,7 @@ class BattleScene extends Phaser.Scene {
             }
         }
         
-        console.log(`  🪨 Placed ${rocksPlaced} rocks`);
+        console.log(`  Ã°Å¸ÂªÂ¨ Placed ${rocksPlaced} rocks`);
     }
     
     createDecorations(worldWidth, worldHeight, centerX, centerY, safeZone) {
@@ -831,7 +884,7 @@ class BattleScene extends Phaser.Scene {
             }
         }
         
-        console.log(`  🎨 Placed ${decosPlaced} decorations`);
+        console.log(`  Ã°Å¸Å½Â¨ Placed ${decosPlaced} decorations`);
     }
     
     createResourcePiles(worldWidth, worldHeight, centerX, centerY, safeZone) {
@@ -874,7 +927,7 @@ class BattleScene extends Phaser.Scene {
             }
         });
         
-        console.log(`  💎 Placed ${totalPlaced} resource piles`);
+        console.log(`  Ã°Å¸â€™Å½ Placed ${totalPlaced} resource piles`);
     }
     
     createSheep(worldWidth, worldHeight, centerX, centerY, safeZone) {
@@ -925,7 +978,7 @@ class BattleScene extends Phaser.Scene {
             }
         }
         
-        console.log(`  🐑 Placed ${sheepPlaced} sheep`);
+        console.log(`  Ã°Å¸Ââ€˜ Placed ${sheepPlaced} sheep`);
     }
     
     createPlayer(x, y) {
@@ -1077,7 +1130,7 @@ class BattleScene extends Phaser.Scene {
         }).setOrigin(1, 0).setScrollFactor(0).setDepth(2000);
         
         // Bottom center - legend
-        this.add.text(width / 2, height - 25, 'Ã°Å¸Å½Â® Click to Move | Q - Dash | E - AOE Attack', {
+        this.add.text(width / 2, height - 25, 'ðŸŽ® Mouse to Move | WASD - Dash | E - AOE | Left Click - Attack', {
             fontSize: '18px',
             color: '#aaaaaa',
             stroke: '#000000',
@@ -1092,7 +1145,7 @@ class BattleScene extends Phaser.Scene {
         
         if (this.currentWave > this.levelConfig.waves) return;
         
-        console.log(`Ã°Å¸Å’Å  Wave ${this.currentWave}/${this.levelConfig.waves}`);
+        console.log(`ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã¢â‚¬â„¢Ãƒâ€¦Ã‚Â  Wave ${this.currentWave}/${this.levelConfig.waves}`);
         this.waveText.setText(`Wave: ${this.currentWave}/${this.levelConfig.waves}`);
         
         const enemyTypes = this.levelConfig.enemyTypes;
@@ -1148,6 +1201,9 @@ class BattleScene extends Phaser.Scene {
         mob.setData('goldReward', config.goldReward);
         mob.setData('isMob', true);
         
+        // Set depth to render above terrain - use y position + offset
+        mob.setDepth(1000 + mob.y);
+        
         // Start with idle animation
         mob.play(`${type}_idle`);
         
@@ -1182,6 +1238,9 @@ class BattleScene extends Phaser.Scene {
         boss.setData('team', 'boss');
         boss.setData('isBoss', true);
         
+        // Set depth to render above terrain - use y position + offset
+        boss.setDepth(1000 + boss.y);
+        
         // Start with idle animation
         boss.play('dragon_idle');
         
@@ -1213,11 +1272,24 @@ class BattleScene extends Phaser.Scene {
     }
     
     setupAbilities() {
-        this.input.keyboard.on('keydown-Q', () => this.useDash());
+        // WASD Directional Dashes
+        this.input.keyboard.on('keydown-W', () => this.useDash(0, -1)); // Up
+        this.input.keyboard.on('keydown-A', () => this.useDash(-1, 0)); // Left
+        this.input.keyboard.on('keydown-S', () => this.useDash(0, 1));  // Down
+        this.input.keyboard.on('keydown-D', () => this.useDash(1, 0));  // Right
+        
+        // AOE ability
         this.input.keyboard.on('keydown-E', () => this.useAOE());
+        
+        // Left-click sword slash attack
+        this.input.on('pointerdown', (pointer) => {
+            if (pointer.leftButtonDown()) {
+                this.useSwordSlash();
+            }
+        });
     }
     
-    useDash() {
+    useDash(dirX, dirY) {
         if (!this.player || !this.player.active) return;
         
         const now = Date.now();
@@ -1225,13 +1297,15 @@ class BattleScene extends Phaser.Scene {
         
         this.abilities.dash.lastUsed = now;
         
-        const angle = this.player.getData('facingAngle') || 0;
+        // Dash in the specified direction
         const distance = GameConfig.abilities.dash.distance;
+        const targetX = this.player.x + (dirX * distance);
+        const targetY = this.player.y + (dirY * distance);
         
         this.tweens.add({
             targets: this.player,
-            x: this.player.x + Math.cos(angle) * distance,
-            y: this.player.y + Math.sin(angle) * distance,
+            x: targetX,
+            y: targetY,
             duration: 150,
             ease: 'Power2'
         });
@@ -1248,8 +1322,137 @@ class BattleScene extends Phaser.Scene {
             onComplete: () => trail.destroy()
         });
         
-        // Show cooldown in HUD
-        this.startAbilityCooldown('Q', this.abilities.dash.cooldown);
+        // Show cooldown in HUD for all WASD keys
+        ['W', 'A', 'S', 'D'].forEach(key => {
+            this.startAbilityCooldown(key, this.abilities.dash.cooldown);
+        });
+    }
+    
+    useSwordSlash() {
+        if (!this.player || !this.player.active) return;
+        
+        const now = Date.now();
+        if (now - this.abilities.attack.lastUsed < this.abilities.attack.cooldown) return;
+        
+        this.abilities.attack.lastUsed = now;
+        
+        // Play attack animation
+        this.updateSpriteAnimation(this.player, false, true);
+        
+        const attackRange = GameConfig.abilities.attack.range * 1.5; // Increased range!
+        const attackArc = GameConfig.abilities.attack.arc * 1.2; // Wider arc!
+        const damage = this.heroStats.damage;
+        
+        // Get player facing angle (towards mouse)
+        const angle = Phaser.Math.Angle.Between(
+            this.player.x, this.player.y,
+            this.pointer.worldX, this.pointer.worldY
+        );
+        
+        // MAIN SLASH EFFECT - Big white arc
+        const slash = this.add.sprite(this.player.x, this.player.y, 'slash');
+        slash.setScale(2.5);
+        slash.setRotation(angle); // Direct angle, no offset needed
+        slash.setAlpha(1);
+        slash.setTint(0xffffff);
+        
+        this.tweens.add({
+            targets: slash,
+            x: this.player.x + Math.cos(angle) * 80,
+            y: this.player.y + Math.sin(angle) * 80,
+            alpha: 0,
+            scale: 3.5,
+            duration: 250,
+            ease: 'Cubic.easeOut',
+            onComplete: () => slash.destroy()
+        });
+        
+        // SECONDARY SLASH - Trailing effect
+        this.time.delayedCall(30, () => {
+            const slash2 = this.add.sprite(this.player.x, this.player.y, 'slash');
+            slash2.setScale(2.2);
+            slash2.setRotation(angle); // Same here - direct angle
+            slash2.setAlpha(0.6);
+            slash2.setTint(0xaaddff);
+            
+            this.tweens.add({
+                targets: slash2,
+                x: this.player.x + Math.cos(angle) * 70,
+                y: this.player.y + Math.sin(angle) * 70,
+                alpha: 0,
+                scale: 3,
+                duration: 220,
+                ease: 'Cubic.easeOut',
+                onComplete: () => slash2.destroy()
+            });
+        });
+        
+        // Flash effect at impact point
+        const flashX = this.player.x + Math.cos(angle) * 60;
+        const flashY = this.player.y + Math.sin(angle) * 60;
+        const flash = this.add.circle(flashX, flashY, 40, 0xffffff, 0.8);
+        this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 2,
+            duration: 150,
+            onComplete: () => flash.destroy()
+        });
+        
+        // Impact particles
+        this.emitImpact(flashX, flashY, 10);
+        
+        // Screen shake for juicy feedback
+        this.cameras.main.shake(100, 0.003);
+        
+        // Check for hits in arc
+        const checkHit = (target) => {
+            if (!target || !target.active) return false;
+            
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+            if (dist > attackRange) return false;
+            
+            const angleToTarget = Phaser.Math.Angle.Between(this.player.x, this.player.y, target.x, target.y);
+            const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(angleToTarget - angle));
+            
+            return angleDiff <= attackArc / 2;
+        };
+        
+        // Damage enemies in arc
+        let hitCount = 0;
+        this.mobs.children.entries.forEach(mob => {
+            if (checkHit(mob)) {
+                this.damageMob(mob, damage);
+                hitCount++;
+            }
+        });
+        
+        this.bosses.children.entries.forEach(boss => {
+            if (checkHit(boss)) {
+                this.damageBoss(boss, damage);
+                hitCount++;
+            }
+        });
+        
+        // Extra effect if hit multiple enemies
+        if (hitCount >= 2) {
+            const multiHitText = this.add.text(this.player.x, this.player.y - 60, `${hitCount}x HIT!`, {
+                fontSize: '24px',
+                color: '#ffaa00',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+            
+            this.tweens.add({
+                targets: multiHitText,
+                y: multiHitText.y - 30,
+                alpha: 0,
+                scale: 1.5,
+                duration: 800,
+                onComplete: () => multiHitText.destroy()
+            });
+        }
     }
     
     useAOE() {
@@ -1299,6 +1502,7 @@ class BattleScene extends Phaser.Scene {
             this.heroStats.xp -= this.heroStats.xpToNext;
             this.heroStats.level++;
             this.heroStats.xpToNext = Math.floor(this.heroStats.xpToNext * 1.5);
+            console.log(`⬆️ LEVEL UP! Now level ${this.heroStats.level}`);
             
             this.heroStats.maxHp += 10;
             this.heroStats.hp = this.heroStats.maxHp;
@@ -1306,7 +1510,7 @@ class BattleScene extends Phaser.Scene {
             this.heroStats.range += 2;
             
             if (this.player && this.player.active) {
-                const levelUpText = this.add.text(this.player.x, this.player.y - 50, 'Ã¢Â¬â€ Ã¯Â¸Â LEVEL UP!', {
+                const levelUpText = this.add.text(this.player.x, this.player.y - 50, 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â LEVEL UP!', {
                     fontSize: '32px',
                     color: '#ffd700',
                     fontStyle: 'bold',
@@ -1321,6 +1525,10 @@ class BattleScene extends Phaser.Scene {
                     duration: 2000,
                     onComplete: () => levelUpText.destroy()
                 });
+                
+                // Show upgrade choice screen!
+                console.log('🎯 Calling showUpgradeChoice...');
+                this.showUpgradeChoice();
             }
             
             this.player.setData('damage', this.heroStats.damage);
@@ -1328,6 +1536,195 @@ class BattleScene extends Phaser.Scene {
         }
         
         // Update HUD
+        this.updateHeroHUD();
+    }
+    
+    showUpgradeChoice() {
+        console.log('🎯 Showing upgrade choice screen...');
+        
+        // Don't pause - just keep running but show UI overlay
+        // this.scene.pause();
+        
+        const { width, height } = this.cameras.main;
+        
+        // Dark overlay
+        const overlay = this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.85)
+            .setScrollFactor(0).setDepth(10000).setInteractive();
+        
+        // Title
+        const title = this.add.text(width / 2, 150, 'âš¡ CHOOSE YOUR UPGRADE âš¡', {
+            fontSize: '48px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10001);
+        
+        // Get 3 random upgrades
+        const upgradeKeys = Object.keys(GameConfig.upgrades);
+        const selectedUpgrades = [];
+        
+        while (selectedUpgrades.length < 3 && upgradeKeys.length > 0) {
+            const randomIndex = Math.floor(Math.random() * upgradeKeys.length);
+            selectedUpgrades.push(upgradeKeys[randomIndex]);
+            upgradeKeys.splice(randomIndex, 1);
+        }
+        
+        console.log('📋 Selected upgrades:', selectedUpgrades);
+        
+        // Create upgrade cards
+        const cardWidth = 280;
+        const cardSpacing = 50;
+        const totalWidth = (cardWidth * 3) + (cardSpacing * 2);
+        const startX = (width - totalWidth) / 2;
+        
+        const uiElements = [overlay, title];
+        
+        selectedUpgrades.forEach((upgradeKey, index) => {
+            const upgrade = GameConfig.upgrades[upgradeKey];
+            const x = startX + (cardWidth / 2) + (index * (cardWidth + cardSpacing));
+            const y = height / 2;
+            
+            // Card background
+            const card = this.add.rectangle(x, y, cardWidth, 320, upgrade.rarity === 'rare' ? 0x8b4ff5 : 0x2a4a5e)
+                .setStrokeStyle(4, upgrade.rarity === 'rare' ? 0xffd700 : 0x5a8aa8)
+                .setScrollFactor(0).setDepth(10001)
+                .setInteractive({ useHandCursor: true });
+            
+            // Icon
+            const icon = this.add.text(x, y - 80, upgrade.icon, {
+                fontSize: '64px'
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+            
+            // Name
+            const name = this.add.text(x, y - 10, upgrade.name, {
+                fontSize: '28px',
+                color: upgrade.rarity === 'rare' ? '#ffd700' : '#ffffff',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+            
+            // Description
+            const desc = this.add.text(x, y + 40, upgrade.description, {
+                fontSize: '18px',
+                color: '#cccccc',
+                align: 'center',
+                wordWrap: { width: cardWidth - 40 },
+                stroke: '#000000',
+                strokeThickness: 3
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+            
+            // Rarity badge
+            if (upgrade.rarity === 'rare') {
+                const badge = this.add.text(x, y - 140, 'â­ RARE', {
+                    fontSize: '16px',
+                    color: '#ffd700',
+                    fontStyle: 'bold',
+                    backgroundColor: '#8b4ff5',
+                    padding: { x: 10, y: 5 }
+                }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+                uiElements.push(badge);
+            }
+            
+            uiElements.push(card, icon, name, desc);
+            
+            // Hover effects
+            card.on('pointerover', () => {
+                card.setStrokeStyle(6, 0xffd700);
+                this.tweens.add({
+                    targets: [card, icon, name, desc],
+                    scale: 1.05,
+                    duration: 150,
+                    ease: 'Power2'
+                });
+            });
+            
+            card.on('pointerout', () => {
+                card.setStrokeStyle(4, upgrade.rarity === 'rare' ? 0xffd700 : 0x5a8aa8);
+                this.tweens.add({
+                    targets: [card, icon, name, desc],
+                    scale: 1,
+                    duration: 150,
+                    ease: 'Power2'
+                });
+            });
+            
+            card.on('pointerdown', () => {
+                console.log('âœ… Upgrade selected:', upgrade.name);
+                
+                // Apply upgrade
+                this.applyUpgrade(upgrade);
+                
+                // Flash effect
+                this.cameras.main.flash(200, 255, 215, 0);
+                
+                // Destroy UI
+                uiElements.forEach(el => el.destroy());
+                
+                // No need to resume since we didn't pause
+                // this.scene.resume();
+            });
+        });
+    }
+    
+    applyUpgrade(upgrade) {
+        const effect = upgrade.effect;
+        
+        switch(effect.stat) {
+            case 'damage':
+                this.heroStats.damage += effect.value;
+                this.player.setData('damage', this.heroStats.damage);
+                break;
+            case 'maxHp':
+                this.heroStats.maxHp += effect.value;
+                this.heroStats.hp += effect.value; // Also heal by that amount
+                break;
+            case 'speed':
+                this.heroStats.speed += effect.value;
+                break;
+            case 'range':
+                this.heroStats.range += effect.value;
+                this.player.setData('attackRange', this.heroStats.range);
+                break;
+            case 'heal':
+                this.heroStats.hp = this.heroStats.maxHp;
+                break;
+            case 'crit':
+                this.heroStats.critChance = (this.heroStats.critChance || 0) + effect.value;
+                break;
+            case 'attackSpeed':
+                this.abilities.attack.cooldown += effect.value; // Negative value to reduce
+                break;
+            case 'dashCooldown':
+                this.abilities.dash.cooldown += effect.value; // Negative value to reduce
+                break;
+            case 'aoeDamage':
+                this.heroStats.aoeDamageMultiplier = (this.heroStats.aoeDamageMultiplier || 1) + effect.value;
+                break;
+            case 'lifesteal':
+                this.heroStats.lifesteal = (this.heroStats.lifesteal || 0) + effect.value;
+                break;
+        }
+        
+        // Show upgrade notification
+        const text = this.add.text(this.cameras.main.width / 2, 200, `${upgrade.icon} ${upgrade.name}!`, {
+            fontSize: '36px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10000);
+        
+        this.tweens.add({
+            targets: text,
+            y: 150,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Cubic.easeOut',
+            onComplete: () => text.destroy()
+        });
+        
         this.updateHeroHUD();
     }
     
@@ -1339,7 +1736,7 @@ class BattleScene extends Phaser.Scene {
         const seconds = Math.max(0, Math.floor(this.timeRemaining / 1000));
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        this.timeText.setText(`Ã¢ÂÂ±Ã¯Â¸Â ${minutes}:${secs.toString().padStart(2, '0')}`);
+        this.timeText.setText(`ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â±ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â ${minutes}:${secs.toString().padStart(2, '0')}`);
         
         // Victory
         if (this.timeRemaining <= 0 || (this.currentWave >= this.levelConfig.waves && this.enemiesAlive === 0)) {
@@ -1414,6 +1811,9 @@ class BattleScene extends Phaser.Scene {
         const WORLD_HEIGHT = this.physics.world.bounds.height;
         this.player.x = Phaser.Math.Clamp(this.player.x, 30, WORLD_WIDTH - 30);
         this.player.y = Phaser.Math.Clamp(this.player.y, 30, WORLD_HEIGHT - 30);
+        
+        // Update depth to keep player above terrain
+        this.player.setDepth(1000 + this.player.y);
     }
     
     updateAlliesFormation() {
@@ -1451,6 +1851,9 @@ class BattleScene extends Phaser.Scene {
             } else {
                 knight.setVelocity(knight.body.velocity.x * 0.88, knight.body.velocity.y * 0.88);
             }
+            
+            // Update depth to keep allies above terrain
+            knight.setDepth(1000 + knight.y);
         });
         
         // Archers back
@@ -1473,6 +1876,9 @@ class BattleScene extends Phaser.Scene {
             } else {
                 archer.setVelocity(archer.body.velocity.x * 0.88, archer.body.velocity.y * 0.88);
             }
+            
+            // Update depth to keep allies above terrain
+            archer.setDepth(1000 + archer.y);
         });
     }
     
@@ -1483,6 +1889,9 @@ class BattleScene extends Phaser.Scene {
             const angle = Phaser.Math.Angle.Between(mob.x, mob.y, this.castle.x, this.castle.y);
             const speed = mob.getData('speed');
             mob.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+            
+            // Update depth to keep mobs above terrain
+            mob.setDepth(1000 + mob.y);
         });
     }
     
@@ -1499,16 +1908,14 @@ class BattleScene extends Phaser.Scene {
             const angle = Phaser.Math.Angle.Between(boss.x, boss.y, targetX, targetY);
             const speed = boss.getData('speed');
             boss.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+            
+            // Update depth to keep bosses above terrain
+            boss.setDepth(1000 + boss.y);
         });
     }
     
     updateCombat(time) {
-        this.autoAttack(this.player, time);
-        
-        this.allies.children.entries.forEach(ally => {
-            if (ally.active) this.autoAttack(ally, time);
-        });
-        
+        // Only enemies auto-attack now - player and allies attack manually
         this.mobs.children.entries.forEach(mob => {
             if (mob.active) this.enemyAutoAttack(mob, time);
         });
@@ -1516,91 +1923,6 @@ class BattleScene extends Phaser.Scene {
         this.bosses.children.entries.forEach(boss => {
             if (boss.active) this.enemyAutoAttack(boss, time);
         });
-    }
-    
-    autoAttack(attacker, time) {
-        const lastAttack = attacker.getData('lastAttack') || 0;
-        const attackSpeed = attacker.getData('attackSpeed') || 500;
-        
-        if (time - lastAttack < attackSpeed) return;
-        
-        const attackRange = attacker.getData('attackRange') || 80;
-        const isArcher = attacker.getData('isArcher') || false;
-        
-        let nearest = null;
-        let minDist = attackRange;
-        
-        this.mobs.children.entries.forEach(mob => {
-            if (!mob.active) return;
-            const dist = Phaser.Math.Distance.Between(attacker.x, attacker.y, mob.x, mob.y);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = mob;
-            }
-        });
-        
-        this.bosses.children.entries.forEach(boss => {
-            if (!boss.active) return;
-            const dist = Phaser.Math.Distance.Between(attacker.x, attacker.y, boss.x, boss.y);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = boss;
-            }
-        });
-        
-        if (nearest) {
-            attacker.setData('lastAttack', time);
-            const damage = attacker.getData('damage');
-            
-            // Trigger attack animation
-            attacker.setData('isAttacking', true);
-            
-            if (isArcher) {
-                const arrow = this.add.sprite(attacker.x, attacker.y, 'arrow');
-                const angle = Phaser.Math.Angle.Between(attacker.x, attacker.y, nearest.x, nearest.y);
-                arrow.setRotation(angle);
-                arrow.setScale(2);
-                
-                this.tweens.add({
-                    targets: arrow,
-                    x: nearest.x,
-                    y: nearest.y,
-                    duration: 120,
-                    onComplete: () => {
-                        arrow.destroy();
-                        if (nearest && nearest.active) {
-                            if (nearest.getData('isBoss')) {
-                                this.damageBoss(nearest, damage);
-                            } else {
-                                this.damageMob(nearest, damage);
-                            }
-                        }
-                    }
-                });
-            } else {
-                const slash = this.add.sprite(attacker.x, attacker.y, 'sword');
-                slash.setAlpha(0.9);
-                slash.setScale(2);
-                const angle = Phaser.Math.Angle.Between(attacker.x, attacker.y, nearest.x, nearest.y);
-                slash.setRotation(angle);
-                
-                this.tweens.add({
-                    targets: slash,
-                    x: nearest.x,
-                    y: nearest.y,
-                    alpha: 0,
-                    rotation: angle + Math.PI * 0.5,
-                    duration: 120,
-                    onComplete: () => slash.destroy()
-                });
-                
-                if (nearest.getData('isBoss')) {
-                    this.damageBoss(nearest, damage);
-                } else {
-                    this.damageMob(nearest, damage);
-                }
-            }
-        }
     }
     
     enemyAutoAttack(enemy, time) {
@@ -1744,7 +2066,7 @@ class BattleScene extends Phaser.Scene {
         // EPIC BOSS DEATH EXPLOSION!
         this.deathExplosion(boss.x, boss.y, true);
         
-        const text = this.add.text(boss.x, boss.y, '💀 BOSS DEFEATED! 💀', {
+        const text = this.add.text(boss.x, boss.y, 'Ã°Å¸â€™â‚¬ BOSS DEFEATED! Ã°Å¸â€™â‚¬', {
             fontSize: '48px',
             color: '#ff0000',
             fontStyle: 'bold',
@@ -1791,12 +2113,12 @@ class BattleScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         if (type === 'speed') {
-            text.setText('Ã¢Å¡Â¡ SPEED BOOST!');
+            text.setText('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¡ SPEED BOOST!');
             const old = this.heroStats.speed;
             this.heroStats.speed *= 1.5;
             this.time.delayedCall(8000, () => { this.heroStats.speed = old; });
         } else if (type === 'damage') {
-            text.setText('Ã°Å¸â€™Âª DAMAGE BOOST!');
+            text.setText('ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Âª DAMAGE BOOST!');
             const old = this.heroStats.damage;
             this.heroStats.damage *= 2;
             this.player.setData('damage', this.heroStats.damage);
@@ -1805,7 +2127,7 @@ class BattleScene extends Phaser.Scene {
                 this.player.setData('damage', old);
             });
         } else {
-            text.setText('Ã¢ÂÂ¤Ã¯Â¸Â HEAL!');
+            text.setText('ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¤ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â HEAL!');
             this.heroStats.hp = this.heroStats.maxHp;
             this.player.setData('hp', this.heroStats.hp);
         }
@@ -1893,7 +2215,7 @@ class BattleScene extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
             .setScrollFactor(0).setDepth(3000);
         
-        this.add.text(width / 2, height / 2 - 100, 'Ã°Å¸Ââ€  VICTORY! Ã°Å¸Ââ€ ', {
+        this.add.text(width / 2, height / 2 - 100, 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â  VICTORY! ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ', {
             fontSize: '64px',
             color: '#ffd700',
             fontStyle: 'bold',
@@ -1909,7 +2231,7 @@ class BattleScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(0.5).setScrollFactor(0).setDepth(3001);
         
-        this.createButton(width / 2, height / 2 + 120, 'Continue Ã¢â€ â€™', () => {
+        this.createButton(width / 2, height / 2 + 120, 'Continue ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢', () => {
             this.scene.start('CastleScene');
         });
     }
@@ -1920,7 +2242,7 @@ class BattleScene extends Phaser.Scene {
         this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
             .setScrollFactor(0).setDepth(3000);
         
-        this.add.text(width / 2, height / 2 - 100, 'Ã°Å¸â€™â‚¬ DEFEATED Ã°Å¸â€™â‚¬', {
+        this.add.text(width / 2, height / 2 - 100, 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ DEFEATED ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬', {
             fontSize: '64px',
             color: '#ff0000',
             fontStyle: 'bold',
@@ -1939,7 +2261,7 @@ class BattleScene extends Phaser.Scene {
             this.scene.restart();
         });
         
-        this.createButton(width / 2, height / 2 + 130, 'Ã¢â€ Â Castle', () => {
+        this.createButton(width / 2, height / 2 + 130, 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â Castle', () => {
             this.scene.start('CastleScene');
         });
     }
@@ -2051,6 +2373,169 @@ class BattleScene extends Phaser.Scene {
                     }
                 });
             }
+        });
+    }
+    
+    openCharacterSheet() {
+        console.log('ðŸ“œ Opening Character Sheet...');
+        this.scene.pause();
+        this.showCharacterSheet();
+    }
+    
+    openSkillTree() {
+        console.log('ðŸŒ³ Opening Skill Tree...');
+        this.scene.pause();
+        this.showSkillTree();
+    }
+    
+    openInventory() {
+        console.log('ðŸŽ’ Opening Inventory...');
+        this.scene.pause();
+        this.showInventory();
+    }
+    
+    showCharacterSheet() {
+        const { width, height } = this.cameras.main;
+        
+        const overlay = this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
+            .setScrollFactor(0).setDepth(10000).setInteractive();
+        
+        const panel = this.add.rectangle(width / 2, height / 2, 600, 700, 0x2a2010)
+            .setScrollFactor(0).setDepth(10001).setStrokeStyle(4, 0x8B4513);
+        
+        const title = this.add.text(width / 2, height / 2 - 320, 'âš”ï¸ CHARACTER âš”ï¸', {
+            fontSize: '32px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+        
+        const heroClass = gameData.data.hero.class;
+        const classConfig = GameConfig.classes[heroClass];
+        
+        const statsText = `
+${classConfig.icon} ${classConfig.name}
+Level ${this.heroStats.level}
+
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+
+âš”ï¸  Damage: ${this.heroStats.damage}
+â¤ï¸  Max HP: ${this.heroStats.maxHp}
+ðŸ’¨ Speed: ${this.heroStats.speed}
+ðŸŽ¯ Range: ${this.heroStats.range}
+
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+
+ðŸ“Š XP: ${this.heroStats.xp} / ${this.heroStats.xpToNext}
+ðŸ° Current Level: ${gameData.data.currentLevel}
+ðŸ’€ Total Kills: ${gameData.data.stats.totalKills}
+ðŸ’° Total Gold: ${gameData.data.totalGold}
+        `;
+        
+        const stats = this.add.text(width / 2, height / 2 - 100, statsText, {
+            fontSize: '20px',
+            color: '#ffffff',
+            align: 'center',
+            lineSpacing: 8
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+        
+        const closeBtn = this.add.rectangle(width / 2, height / 2 + 280, 150, 50, 0x8B4513)
+            .setScrollFactor(0).setDepth(10002).setInteractive({ useHandCursor: true });
+        
+        const closeText = this.add.text(width / 2, height / 2 + 280, 'CLOSE', {
+            fontSize: '24px',
+            color: '#ffd700',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+        
+        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0xaa6633));
+        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0x8B4513));
+        closeBtn.on('pointerdown', () => {
+            [overlay, panel, title, stats, closeBtn, closeText].forEach(obj => obj.destroy());
+            this.scene.resume();
+        });
+    }
+    
+    showSkillTree() {
+        const { width, height } = this.cameras.main;
+        
+        const overlay = this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
+            .setScrollFactor(0).setDepth(10000).setInteractive();
+        
+        const panel = this.add.rectangle(width / 2, height / 2, 600, 400, 0x2a2010)
+            .setScrollFactor(0).setDepth(10001).setStrokeStyle(4, 0x8B4513);
+        
+        const title = this.add.text(width / 2, height / 2 - 150, 'ðŸŒ³ SKILL TREE ðŸŒ³', {
+            fontSize: '32px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+        
+        const message = this.add.text(width / 2, height / 2, 'Coming Soon!\n\nUnlock powerful abilities\nand passive bonuses', {
+            fontSize: '24px',
+            color: '#ffffff',
+            align: 'center',
+            lineSpacing: 10
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+        
+        const closeBtn = this.add.rectangle(width / 2, height / 2 + 130, 150, 50, 0x8B4513)
+            .setScrollFactor(0).setDepth(10002).setInteractive({ useHandCursor: true });
+        
+        const closeText = this.add.text(width / 2, height / 2 + 130, 'CLOSE', {
+            fontSize: '24px',
+            color: '#ffd700',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+        
+        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0xaa6633));
+        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0x8B4513));
+        closeBtn.on('pointerdown', () => {
+            [overlay, panel, title, message, closeBtn, closeText].forEach(obj => obj.destroy());
+            this.scene.resume();
+        });
+    }
+    
+    showInventory() {
+        const { width, height } = this.cameras.main;
+        
+        const overlay = this.add.rectangle(width / 2, height / 2, width * 2, height * 2, 0x000000, 0.8)
+            .setScrollFactor(0).setDepth(10000).setInteractive();
+        
+        const panel = this.add.rectangle(width / 2, height / 2, 600, 400, 0x2a2010)
+            .setScrollFactor(0).setDepth(10001).setStrokeStyle(4, 0x8B4513);
+        
+        const title = this.add.text(width / 2, height / 2 - 150, 'ðŸŽ’ INVENTORY ðŸŽ’', {
+            fontSize: '32px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+        
+        const message = this.add.text(width / 2, height / 2, 'Coming Soon!\n\nEquip weapons, armor,\nand potions', {
+            fontSize: '24px',
+            color: '#ffffff',
+            align: 'center',
+            lineSpacing: 10
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10002);
+        
+        const closeBtn = this.add.rectangle(width / 2, height / 2 + 130, 150, 50, 0x8B4513)
+            .setScrollFactor(0).setDepth(10002).setInteractive({ useHandCursor: true });
+        
+        const closeText = this.add.text(width / 2, height / 2 + 130, 'CLOSE', {
+            fontSize: '24px',
+            color: '#ffd700',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+        
+        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0xaa6633));
+        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0x8B4513));
+        closeBtn.on('pointerdown', () => {
+            [overlay, panel, title, message, closeBtn, closeText].forEach(obj => obj.destroy());
+            this.scene.resume();
         });
     }
 }
