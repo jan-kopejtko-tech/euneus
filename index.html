@@ -8,12 +8,18 @@
     <!-- Phaser -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
     
+    <!-- Authentication System (LOAD FIRST) -->
+    <script src="authsystem.js"></script>
+    <script src="trialmonitor.js"></script>
+    <script src="levelblocker.js"></script>
+    
     <!-- Game Systems -->
     <script src="game-config.js"></script>
     <script src="savesystem.js"></script>
     <script src="gamedata.js"></script>
     
     <!-- Game Scenes -->
+    <script src="loginscene.js"></script>
     <script src="menuscene.js"></script>
     <script src="classselectscene.js"></script>
     <script src="castlescene.js"></script>
@@ -728,6 +734,7 @@
                 }
             },
             scene: [
+                LoginScene,
                 MenuScene,
                 ClassSelectScene,
                 CastleScene,

@@ -3,11 +3,18 @@ class CastleScene extends Phaser.Scene {
     constructor() {
         super({ key: 'CastleScene' });
         this.passiveGoldTimer = 0;
+        this.levelBlocker = null;
     }
     
     create() {
         const { width, height } = this.cameras.main;
         
+        
+        // Initialize level blocker
+        this.levelBlocker = new LevelBlocker(this);
+        
+        // Show trial banner if in trial mode
+        this.trialBannerElements = this.levelBlocker.showTrialBanner();
         // Background
         this.add.rectangle(width / 2, height / 2, width, height, 0x2d5016);
         
@@ -160,7 +167,7 @@ class CastleScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true })
             .setDepth(9999);
         
-        const debugStartText = this.add.text(width / 2, 100, '🎮 CLICK HERE TO START BATTLE', {
+        const debugStartText = this.add.text(width / 2, 100, 'ðŸŽ® CLICK HERE TO START BATTLE', {
             fontSize: '24px',
             color: '#ffffff',
             fontStyle: 'bold',
@@ -185,7 +192,7 @@ class CastleScene extends Phaser.Scene {
         const startBtn = this.add.rectangle(width / 2, height - 120, 300, 80, 0x00aa00)
             .setInteractive({ useHandCursor: true });
         
-        const startText = this.add.text(width / 2, height - 120, '▶️ ' + GameConfig.text.startLevel, {
+        const startText = this.add.text(width / 2, height - 120, 'â–¶ï¸ ' + GameConfig.text.startLevel, {
             fontSize: '36px',
             color: '#ffffff',
             fontStyle: 'bold'
@@ -209,7 +216,7 @@ class CastleScene extends Phaser.Scene {
         const menuBtn = this.add.rectangle(80, 40, 120, 40, 0x444444)
             .setInteractive({ useHandCursor: true });
         
-        const menuText = this.add.text(80, 40, '← Menu', {
+        const menuText = this.add.text(80, 40, 'â† Menu', {
             fontSize: '18px',
             color: '#ffffff'
         }).setOrigin(0.5);
@@ -337,6 +344,13 @@ class CastleScene extends Phaser.Scene {
             return;
         }
         
+        
+        // Check if level is accessible (blocks Level 2+ in trial mode)
+        const currentLevel = gameData.data.currentLevel;
+        if (this.levelBlocker && this.levelBlocker.checkAndBlock(currentLevel)) {
+            console.log(`🔒 Level ${currentLevel} blocked - showing registration screen`);
+            return; // Don't start level, blocker is shown
+        }
         // Save before starting level
         gameData.saveGame();
         
