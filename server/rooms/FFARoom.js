@@ -1,6 +1,6 @@
 const { Room } = require("@colyseus/core");
 const { Schema, MapSchema, type } = require("@colyseus/schema");
-const GameConfig = require("../GameConfig"); // Fixed path
+const GameConfig = require("../GameConfig");
 
 // Player state schema
 class Player extends Schema {
@@ -8,7 +8,7 @@ class Player extends Schema {
     super();
     this.x = x;
     this.y = y;
-    this.z = 0; // Jump height
+    this.z = 0;
     this.vx = 0;
     this.vy = 0;
     this.vz = 0;
@@ -28,17 +28,11 @@ class Player extends Schema {
     this.xpToNext = GameConfig.XP_PER_LEVEL;
     this.kills = 0;
     
-    // Class (unlocked at level 5)
+    // Class
     this.class = "none";
     
-    // Input buffer
-    this.input = {
-      moveX: 0,
-      moveY: 0,
-      wantsToJump: false,
-      wantsToAttack: false,
-      attackAngle: 0
-    };
+    // Last update time for validation
+    this.lastUpdateTime = Date.now();
   }
 }
 
@@ -100,11 +94,11 @@ type({ map: Player })(GameState.prototype, "players");
 type({ map: NPC })(GameState.prototype, "npcs");
 type("number")(GameState.prototype, "tick");
 
-// Main game room
+// Main game room with CLIENT-AUTHORITATIVE movement
 class FFARoom extends Room {
   
   onCreate(options) {
-    console.log("🎮 FFA Room Created!");
+    console.log("🎮 FFA Room Created (CLIENT-AUTHORITATIVE)");
     
     this.setState(new GameState());
     this.maxClients = 200;
@@ -112,24 +106,63 @@ class FFARoom extends Room {
     // Spawn initial NPCs
     this.spawnNPCs(GameConfig.NPC_COUNT);
     
-    // Message handlers
-    this.onMessage("input", (client, message) => {
+    // CLIENT SENDS POSITION (Agar.io style)
+    this.onMessage("position", (client, message) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player) return;
+      if (!player || player.hp <= 0) return;
       
-      // Store input for processing in game loop
-      player.input.moveX = Math.max(-1, Math.min(1, message.moveX || 0));
-      player.input.moveY = Math.max(-1, Math.min(1, message.moveY || 0));
-      player.input.wantsToJump = message.jump || false;
-      player.input.wantsToAttack = message.attack || false;
-      player.input.attackAngle = message.attackAngle || 0;
+      const now = Date.now();
+      const timeSinceLastUpdate = now - player.lastUpdateTime;
       
-      // Update facing angle
-      if (message.mouseX !== undefined && message.mouseY !== undefined) {
-        player.angle = Math.atan2(
-          message.mouseY - player.y,
-          message.mouseX - player.x
-        );
+      // Anti-cheat: Validate movement speed
+      const dx = message.x - player.x;
+      const dy = message.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Calculate max allowed distance based on time and player speed
+      const stage = this.getEvolutionStage(player.level);
+      let maxSpeed = stage.speed;
+      
+      // Apply class modifiers
+      if (player.class === "berserker") maxSpeed *= GameConfig.CLASSES.berserker.speedBonus;
+      else if (player.class === "paladin") maxSpeed *= GameConfig.CLASSES.paladin.speedPenalty;
+      else if (player.class === "assassin") maxSpeed *= GameConfig.CLASSES.assassin.speedBonus;
+      
+      const maxDistance = (maxSpeed * (timeSinceLastUpdate / 1000)) * 1.5; // 50% tolerance
+      
+      if (distance > maxDistance) {
+        console.warn(`⚠️ ${player.username} moved too fast! ${distance.toFixed(0)}px in ${timeSinceLastUpdate}ms (max: ${maxDistance.toFixed(0)}px)`);
+        // Reject the update - don't move player
+        return;
+      }
+      
+      // ACCEPT CLIENT POSITION
+      player.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, message.x));
+      player.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, message.y));
+      player.vx = message.vx || 0;
+      player.vy = message.vy || 0;
+      player.angle = message.angle || player.angle;
+      
+      player.lastUpdateTime = now;
+    });
+    
+    this.onMessage("attack", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.hp <= 0) return;
+      
+      if (player.attackCooldown <= 0 && !player.isAttacking) {
+        this.performAttack(client.sessionId, message.angle);
+      }
+    });
+    
+    this.onMessage("jump", (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.hp <= 0) return;
+      
+      if (player.z === 0 && !player.isAirborne) {
+        player.vz = GameConfig.JUMP_FORCE;
+        player.z = 0.1;
+        player.isAirborne = true;
       }
     });
     
@@ -148,7 +181,7 @@ class FFARoom extends Room {
       }
     });
     
-    // Game loop - 20 ticks per second
+    // Game loop - ONLY for NPCs and server-side effects now
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GameConfig.TICK_RATE);
     
     // Spawn NPCs periodically
@@ -163,7 +196,6 @@ class FFARoom extends Room {
   onJoin(client, options) {
     console.log(`✅ ${options.username || "Player"} joined`);
     
-    // Random spawn position
     const player = new Player(
       Math.random() * GameConfig.WORLD_WIDTH,
       Math.random() * GameConfig.WORLD_HEIGHT,
@@ -172,7 +204,6 @@ class FFARoom extends Room {
     
     this.state.players.set(client.sessionId, player);
     
-    // Send initial info
     client.send("init", {
       sessionId: client.sessionId,
       worldWidth: GameConfig.WORLD_WIDTH,
@@ -190,112 +221,85 @@ class FFARoom extends Room {
     this.npcSpawnTimer.clear();
   }
   
-  // GAME LOOP
+  // GAME LOOP - Only NPCs and server-side effects
   update(deltaTime) {
     this.state.tick++;
-    const dt = deltaTime / 1000; // Convert to seconds
+    const dt = deltaTime / 1000;
     
-    // Debug: Log every second
-    if (this.state.tick % 20 === 0) {
-      console.log(`⚙️ Game loop tick ${this.state.tick}, players: ${this.state.players.size}, NPCs: ${this.state.npcs.size}`);
-    }
-    
-    // 1. Process inputs
-    this.processInputs(dt);
-    
-    // 2. Update physics
-    this.updatePhysics(dt);
-    
-    // 3. Check collisions
-    this.checkCollisions();
-    
-    // 4. Update NPCs
+    // Update NPCs
     this.updateNPCs(dt);
     
-    // 5. Update cooldowns
+    // Update player physics (jump/gravity only)
+    this.updatePlayerPhysics(dt);
+    
+    // Update cooldowns
     this.updateCooldowns(dt);
+    
+    // Check collisions
+    this.checkCollisions();
   }
   
-  processInputs(dt) {
+  updatePlayerPhysics(dt) {
+    // Only handle gravity/jump - position is client-controlled
     for (let [sessionId, player] of this.state.players) {
-      if (player.hp <= 0) continue;
-      
-      const stage = this.getEvolutionStage(player.level);
-      let speed = stage.speed;
-      
-      // Apply class modifiers
-      if (player.class === "berserker") {
-        speed *= GameConfig.CLASSES.berserker.speedBonus;
-      } else if (player.class === "paladin") {
-        speed *= GameConfig.CLASSES.paladin.speedPenalty;
-      } else if (player.class === "assassin") {
-        speed *= GameConfig.CLASSES.assassin.speedBonus;
-      }
-      
-      // Apply movement input
-      const inputMag = Math.sqrt(player.input.moveX ** 2 + player.input.moveY ** 2);
-      if (inputMag > 0) {
-        player.vx = (player.input.moveX / inputMag) * speed;
-        player.vy = (player.input.moveY / inputMag) * speed;
-        
-        // Debug: Log occasionally
-        if (this.state.tick % 20 === 0) {
-          console.log(`🎮 Processing input for ${player.username}: moveX=${player.input.moveX}, moveY=${player.input.moveY}, vx=${player.vx.toFixed(1)}, vy=${player.vy.toFixed(1)}`);
-        }
-      }
-      
-      // Jump
-      if (player.input.wantsToJump && player.z === 0 && !player.isAirborne) {
-        player.vz = GameConfig.JUMP_FORCE;
-        player.z = 0.1;
-        player.isAirborne = true;
-      }
-      
-      // Attack
-      if (player.input.wantsToAttack && player.attackCooldown <= 0 && !player.isAttacking) {
-        this.performAttack(sessionId, player.input.attackAngle);
-      }
-    }
-  }
-  
-  updatePhysics(dt) {
-    for (let [sessionId, player] of this.state.players) {
-      // Update position
-      player.x += player.vx * dt;
-      player.y += player.vy * dt;
-      
-      // Gravity & jump physics
       if (player.z > 0 || player.vz > 0) {
         player.vz -= GameConfig.GRAVITY * dt;
         player.z += player.vz * dt;
         
-        // Landing
         if (player.z <= 0) {
           player.z = 0;
           player.vz = 0;
           player.isAirborne = false;
         }
       }
-      
-      // Friction
-      player.vx *= GameConfig.FRICTION;
-      player.vy *= GameConfig.FRICTION;
-      
-      // Keep in world bounds
-      player.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, player.x));
-      player.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, player.y));
     }
-    
-    // NPC physics
+  }
+  
+  updateNPCs(dt) {
     for (let [npcId, npc] of this.state.npcs) {
+      // Random walk
+      if (Math.random() < 0.02) {
+        npc.targetX = Math.random() * GameConfig.WORLD_WIDTH;
+        npc.targetY = Math.random() * GameConfig.WORLD_HEIGHT;
+      }
+      
+      // Move toward target
+      const dx = npc.targetX - npc.x;
+      const dy = npc.targetY - npc.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist > 10) {
+        npc.vx = (dx / dist) * GameConfig.NPC_SPEED;
+        npc.vy = (dy / dist) * GameConfig.NPC_SPEED;
+      } else {
+        npc.vx *= GameConfig.FRICTION;
+        npc.vy *= GameConfig.FRICTION;
+      }
+      
+      // Update position
       npc.x += npc.vx * dt;
       npc.y += npc.vy * dt;
       
-      npc.vx *= GameConfig.FRICTION;
-      npc.vy *= GameConfig.FRICTION;
-      
+      // Bounds
       npc.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, npc.x));
       npc.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, npc.y));
+    }
+  }
+  
+  updateCooldowns(dt) {
+    for (let player of this.state.players.values()) {
+      if (player.attackCooldown > 0) {
+        player.attackCooldown -= dt * 1000;
+        if (player.attackCooldown <= 0) {
+          player.isAttacking = false;
+        }
+      }
+      
+      // Paladin regen
+      if (player.class === "paladin" && player.hp < player.maxHp && player.hp > 0) {
+        player.hp += GameConfig.CLASSES.paladin.regenRate * dt;
+        player.hp = Math.min(player.hp, player.maxHp);
+      }
     }
   }
   
@@ -333,12 +337,11 @@ class FFARoom extends Room {
             p1.hp -= damage;
             p2.hp -= damage;
             
-            // Knockback
             const nx = dx / dist;
             const ny = dy / dist;
             p1.vx -= nx * GameConfig.KNOCKBACK_FORCE;
             p1.vy -= ny * GameConfig.KNOCKBACK_FORCE;
-            p1.vz = -10; // Slam down
+            p1.vz = -10;
             
             p2.vx += nx * GameConfig.KNOCKBACK_FORCE;
             p2.vy += ny * GameConfig.KNOCKBACK_FORCE;
@@ -349,55 +352,7 @@ class FFARoom extends Room {
             this.checkDeath(id1, p1, id2);
             this.checkDeath(id2, p2, id1);
           }
-          // Ground collision (push apart)
-          else if (!p1.isAirborne && !p2.isAirborne) {
-            const overlap = minDist - dist;
-            const nx = dx / dist;
-            const ny = dy / dist;
-            
-            p1.x -= nx * overlap * 0.5;
-            p1.y -= ny * overlap * 0.5;
-            p2.x += nx * overlap * 0.5;
-            p2.y += ny * overlap * 0.5;
-          }
         }
-      }
-    }
-  }
-  
-  updateNPCs(dt) {
-    for (let [npcId, npc] of this.state.npcs) {
-      // Random walk
-      if (Math.random() < 0.02) {
-        npc.targetX = Math.random() * GameConfig.WORLD_WIDTH;
-        npc.targetY = Math.random() * GameConfig.WORLD_HEIGHT;
-      }
-      
-      // Move toward target
-      const dx = npc.targetX - npc.x;
-      const dy = npc.targetY - npc.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist > 10) {
-        npc.vx = (dx / dist) * GameConfig.NPC_SPEED;
-        npc.vy = (dy / dist) * GameConfig.NPC_SPEED;
-      }
-    }
-  }
-  
-  updateCooldowns(dt) {
-    for (let player of this.state.players.values()) {
-      if (player.attackCooldown > 0) {
-        player.attackCooldown -= dt * 1000;
-        if (player.attackCooldown <= 0) {
-          player.isAttacking = false;
-        }
-      }
-      
-      // Paladin regen
-      if (player.class === "paladin" && player.hp < player.maxHp && player.hp > 0) {
-        player.hp += GameConfig.CLASSES.paladin.regenRate * dt;
-        player.hp = Math.min(player.hp, player.maxHp);
       }
     }
   }
@@ -414,7 +369,6 @@ class FFARoom extends Room {
     const arc = GameConfig.ATTACK_ARC;
     let damage = stage.damage;
     
-    // Class modifiers
     if (attacker.class === "berserker") {
       damage *= GameConfig.CLASSES.berserker.damageBonus;
     }
@@ -422,7 +376,7 @@ class FFARoom extends Room {
     // Check players
     for (let [targetId, target] of this.state.players) {
       if (targetId === attackerId || target.hp <= 0) continue;
-      if (target.z > 10 && attacker.z < 5) continue; // Can't hit airborne
+      if (target.z > 10 && attacker.z < 5) continue;
       
       const dx = target.x - attacker.x;
       const dy = target.y - attacker.y;
@@ -435,7 +389,6 @@ class FFARoom extends Room {
       if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
       
       if (angleDiff <= arc / 2) {
-        // Backstab check
         const isBackstab = Math.abs(angleDiff - Math.PI) < Math.PI / 4;
         let backstabMult = isBackstab ? GameConfig.BACKSTAB_MULTIPLIER : 1;
         
@@ -446,7 +399,6 @@ class FFARoom extends Room {
         const finalDamage = damage * backstabMult;
         target.hp -= finalDamage;
         
-        // Knockback
         const nx = Math.cos(angle);
         const ny = Math.sin(angle);
         target.vx += nx * GameConfig.KNOCKBACK_FORCE;
@@ -478,7 +430,6 @@ class FFARoom extends Room {
       if (angleDiff <= arc / 2) {
         npc.hp -= damage;
         
-        // Knockback
         npc.vx += Math.cos(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
         npc.vy += Math.sin(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
         
@@ -497,7 +448,6 @@ class FFARoom extends Room {
     if (victim.hp <= 0) {
       const killer = this.state.players.get(killerId);
       
-      // XP steal
       if (killer) {
         const levelDiff = victim.level - killer.level;
         const isAssassination = levelDiff >= 5;
@@ -526,7 +476,7 @@ class FFARoom extends Room {
       
       const stage = this.getEvolutionStage(player.level);
       player.maxHp = stage.hp;
-      player.hp = stage.hp; // Full heal on level up
+      player.hp = stage.hp;
       
       this.applyClassStats(player);
       
@@ -553,7 +503,6 @@ class FFARoom extends Room {
     const player = this.state.players.get(sessionId);
     if (!player) return;
     
-    // Reset to level 1
     player.level = 1;
     player.xp = 0;
     player.xpToNext = GameConfig.XP_PER_LEVEL;
@@ -562,7 +511,6 @@ class FFARoom extends Room {
     player.kills = 0;
     player.class = "none";
     
-    // Random spawn
     player.x = Math.random() * GameConfig.WORLD_WIDTH;
     player.y = Math.random() * GameConfig.WORLD_HEIGHT;
     player.z = 0;
