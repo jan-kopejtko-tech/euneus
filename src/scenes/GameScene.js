@@ -4,8 +4,6 @@ class GameScene extends Phaser.Scene {
     }
     
     preload() {
-        console.log('📦 PRELOAD START');
-        
         // Load Tiny Swords assets - paths relative to root
         const basePath = 'assets';
         
@@ -28,85 +26,22 @@ class GameScene extends Phaser.Scene {
         // Terrain
         this.load.image('ground', `${basePath}/Terrain/Ground/Tilemap_Flat.png`);
         this.load.image('tree', `${basePath}/Resources/Trees/Tree.png`);
-        
-        console.log('📦 PRELOAD COMPLETE');
     }
     
     create() {
-        console.log('🎮 ============ CREATE START ============');
+        console.log('🎮 Game Scene Started');
         
         // World setup
         this.WORLD_WIDTH = GameConfig.WORLD_WIDTH;
         this.WORLD_HEIGHT = GameConfig.WORLD_HEIGHT;
         
-        console.log('🌍 World size:', this.WORLD_WIDTH, 'x', this.WORLD_HEIGHT);
-        
         this.physics.world.setBounds(0, 0, this.WORLD_WIDTH, this.WORLD_HEIGHT);
         this.cameras.main.setBounds(0, 0, this.WORLD_WIDTH, this.WORLD_HEIGHT);
         this.cameras.main.setZoom(0.8);
         
-        console.log('📷 Camera initial position:', this.cameras.main.scrollX, this.cameras.main.scrollY);
-        console.log('📷 Camera zoom:', this.cameras.main.zoom);
-        
         // Background
-        const bg = this.add.rectangle(this.WORLD_WIDTH / 2, this.WORLD_HEIGHT / 2, 
+        this.add.rectangle(this.WORLD_WIDTH / 2, this.WORLD_HEIGHT / 2, 
             this.WORLD_WIDTH, this.WORLD_HEIGHT, 0x5a7c3e);
-        console.log('🎨 Background created at:', bg.x, bg.y);
-        
-        // DEBUG: Add visible grid
-        console.log('🔲 Creating debug grid...');
-        this.debugGraphics = this.add.graphics();
-        this.debugGraphics.lineStyle(2, 0xff0000, 0.5);
-        
-        // Vertical lines every 500px
-        for (let x = 0; x < this.WORLD_WIDTH; x += 500) {
-            this.debugGraphics.lineBetween(x, 0, x, this.WORLD_HEIGHT);
-        }
-        
-        // Horizontal lines every 500px
-        for (let y = 0; y < this.WORLD_HEIGHT; y += 500) {
-            this.debugGraphics.lineBetween(0, y, this.WORLD_WIDTH, y);
-        }
-        
-        // DEBUG: Add corner markers
-        this.add.circle(0, 0, 30, 0xff0000).setDepth(1000);
-        this.add.text(50, 50, 'TOP-LEFT (0,0)', {
-            fontSize: '24px',
-            color: '#ff0000',
-            backgroundColor: '#000000'
-        }).setDepth(1000);
-        
-        this.add.circle(this.WORLD_WIDTH, 0, 30, 0x00ff00).setDepth(1000);
-        this.add.text(this.WORLD_WIDTH - 200, 50, 'TOP-RIGHT', {
-            fontSize: '24px',
-            color: '#00ff00',
-            backgroundColor: '#000000'
-        }).setDepth(1000);
-        
-        this.add.circle(0, this.WORLD_HEIGHT, 30, 0x0000ff).setDepth(1000);
-        this.add.text(50, this.WORLD_HEIGHT - 50, 'BOTTOM-LEFT', {
-            fontSize: '24px',
-            color: '#0000ff',
-            backgroundColor: '#000000'
-        }).setDepth(1000);
-        
-        this.add.circle(this.WORLD_WIDTH, this.WORLD_HEIGHT, 30, 0xffff00).setDepth(1000);
-        this.add.text(this.WORLD_WIDTH - 200, this.WORLD_HEIGHT - 50, 'BOTTOM-RIGHT', {
-            fontSize: '24px',
-            color: '#ffff00',
-            backgroundColor: '#000000'
-        }).setDepth(1000);
-        
-        // DEBUG: Add center marker
-        this.add.circle(this.WORLD_WIDTH / 2, this.WORLD_HEIGHT / 2, 100, 0xff00ff).setDepth(1000);
-        this.add.text(this.WORLD_WIDTH / 2, this.WORLD_HEIGHT / 2, 'WORLD CENTER\n' + this.WORLD_WIDTH/2 + ',' + this.WORLD_HEIGHT/2, {
-            fontSize: '32px',
-            color: '#ffffff',
-            backgroundColor: '#000000',
-            align: 'center'
-        }).setOrigin(0.5).setDepth(1000);
-        
-        console.log('✅ Debug markers created');
         
         // Create animations
         this.createAnimations();
@@ -117,8 +52,6 @@ class GameScene extends Phaser.Scene {
         this.nameTexts = new Map();
         this.healthBars = new Map();
         this.shadows = new Map();
-        
-        console.log('📋 Sprite maps initialized');
         
         // Local player reference
         this.localPlayer = null;
@@ -133,17 +66,6 @@ class GameScene extends Phaser.Scene {
             d: this.input.keyboard.addKey('D')
         };
         this.spaceKey = this.input.keyboard.addKey('SPACE');
-        
-        console.log('⌨️ Input initialized');
-        
-        // DEBUG: Log input events
-        this.input.keyboard.on('keydown', (event) => {
-            console.log('⌨️ Key pressed:', event.key);
-        });
-        
-        this.input.on('pointerdown', (pointer) => {
-            console.log('🖱️ Mouse clicked at world:', pointer.worldX, pointer.worldY);
-        });
         
         // Connect to server
         this.connectToServer();
@@ -161,38 +83,15 @@ class GameScene extends Phaser.Scene {
             callback: () => this.updateLeaderboard(),
             loop: true
         });
-        
-        // DEBUG: Log every second
-        this.time.addEvent({
-            delay: 1000,
-            callback: () => {
-                console.log('📊 DEBUG STATUS:');
-                console.log('  - Players:', this.playerSprites.size);
-                console.log('  - NPCs:', this.npcSprites.size);
-                console.log('  - Camera pos:', Math.round(this.cameras.main.scrollX), Math.round(this.cameras.main.scrollY));
-                if (this.localPlayer) {
-                    console.log('  - Local player pos:', Math.round(this.localPlayer.x), Math.round(this.localPlayer.y));
-                    console.log('  - Local player HP:', this.localPlayer.hp, '/', this.localPlayer.maxHp);
-                    console.log('  - Local player Level:', this.localPlayer.level);
-                } else {
-                    console.log('  - ⚠️ NO LOCAL PLAYER!');
-                }
-            },
-            loop: true
-        });
-        
-        console.log('🎮 ============ CREATE COMPLETE ============');
     }
     
     async connectToServer() {
         console.log('🔌 ============ CONNECTING TO SERVER ============');
         
-        // Determine server URL based on environment
         let SERVER_URL;
         if (window.location.hostname === 'localhost') {
             SERVER_URL = 'ws://localhost:2567';
         } else {
-            // Production - Railway provides the public domain
             SERVER_URL = 'wss://euneus-production.up.railway.app';
         }
         
@@ -206,47 +105,74 @@ class GameScene extends Phaser.Scene {
             this.room = await this.client.joinOrCreate("ffa", { username: username });
             console.log('✅ Connected to room');
             
-            // Handle initial connection
+            // Handle initial connection message
             this.room.onMessage("init", (message) => {
                 this.mySessionId = message.sessionId;
                 console.log('🎮 My session ID:', this.mySessionId);
             });
             
-            // Listen for state changes
+            // CRITICAL FIX: Wait for the initial state to be fully synchronized
+            this.room.onStateChange.once((state) => {
+                console.log('📊 ============ INITIAL STATE RECEIVED ============');
+                console.log('👥 Players in state:', state.players.size);
+                console.log('👹 NPCs in state:', state.npcs.size);
+                
+                // Add all existing entities
+                state.players.forEach((player, sessionId) => {
+                    console.log('➕ Adding existing player:', sessionId, player.username);
+                    this.addPlayer(sessionId, player);
+                });
+                
+                state.npcs.forEach((npc, npcId) => {
+                    console.log('➕ Adding existing NPC:', npcId);
+                    this.addNPC(npcId, npc);
+                });
+                
+                console.log('✅ Initial state synchronized');
+            });
+            
+            // Listen for future additions/removals
             this.room.state.players.onAdd = (player, sessionId) => {
-                console.log('➕ Player added:', sessionId, 'at position', player.x, player.y);
+                // Skip if this player was already added in initial sync
+                if (this.playerSprites.has(sessionId)) {
+                    console.log('⏭️ Skipping duplicate player:', sessionId);
+                    return;
+                }
+                console.log('🆕 NEW player joined:', sessionId, player.username);
                 this.addPlayer(sessionId, player);
             };
             
             this.room.state.players.onRemove = (player, sessionId) => {
-                console.log('➖ Player removed:', sessionId);
+                console.log('👋 Player left:', sessionId);
                 this.removePlayer(sessionId);
             };
             
             this.room.state.npcs.onAdd = (npc, npcId) => {
-                console.log('➕ NPC added:', npcId, 'at position', npc.x, npc.y);
+                // Skip if this NPC was already added in initial sync
+                if (this.npcSprites.has(npcId)) {
+                    console.log('⏭️ Skipping duplicate NPC:', npcId);
+                    return;
+                }
+                console.log('🆕 NEW NPC spawned:', npcId);
                 this.addNPC(npcId, npc);
             };
             
             this.room.state.npcs.onRemove = (npc, npcId) => {
-                console.log('➖ NPC removed:', npcId);
+                console.log('💀 NPC removed:', npcId);
                 this.removeNPC(npcId);
             };
             
             // Combat events
             this.room.onMessage("player_hit", (data) => {
-                console.log('💥 Player hit:', data);
                 this.showHitEffect(data.target, data.damage, data.isBackstab);
             });
             
             this.room.onMessage("npc_hit", (data) => {
-                console.log('💥 NPC hit:', data);
                 const sprite = this.npcSprites.get(data.npcId);
                 if (sprite) this.flashSprite(sprite);
             });
             
             this.room.onMessage("player_killed", (data) => {
-                console.log('💀 Player killed:', data);
                 if (data.victim === this.mySessionId) {
                     this.showDeathScreen(data);
                 }
@@ -254,31 +180,24 @@ class GameScene extends Phaser.Scene {
             });
             
             this.room.onMessage("npc_killed", (data) => {
-                console.log('💀 NPC killed:', data);
                 this.playDeathEffect(data.npcId, true);
             });
             
             this.room.onMessage("player_levelup", (data) => {
-                console.log('⬆️ Player level up:', data);
+                // Show level up effect
             });
             
             this.room.onMessage("midair_collision", (data) => {
-                console.log('💥 Midair collision:', data);
                 this.showCollisionEffect(data.p1, data.p2);
             });
             
-            console.log('🔌 ============ SERVER CONNECTED ============');
-            
         } catch (e) {
-            console.error('❌ ============ CONNECTION FAILED ============');
-            console.error('❌ Error:', e);
-            alert('Failed to connect to server! Make sure server is running.\n\nError: ' + e.message);
+            console.error('❌ Failed to connect:', e);
+            alert('Failed to connect to server! Make sure server is running.');
         }
     }
     
     createAnimations() {
-        console.log('🎬 Creating animations...');
-        
         // Pawn animations (peasant)
         if (!this.anims.exists('pawn-idle')) {
             this.anims.create({
@@ -352,45 +271,26 @@ class GameScene extends Phaser.Scene {
                 repeat: 0
             });
         }
-        
-        console.log('✅ Animations created');
     }
     
     addPlayer(sessionId, player) {
-        console.log('👤 ============ ADDING PLAYER ============');
-        console.log('  Session ID:', sessionId);
-        console.log('  Position:', player.x, player.y);
-        console.log('  Username:', player.username);
-        console.log('  Level:', player.level);
-        console.log('  HP:', player.hp, '/', player.maxHp);
+        console.log(`➕ Adding player sprite for ${sessionId} (${player.username})`);
         
         const isLocal = sessionId === this.mySessionId;
-        console.log('  Is local player?', isLocal);
         
         // Shadow
         const shadow = this.add.ellipse(player.x, player.y, 40, 20, 0x000000, 0.3);
         shadow.setDepth(-1);
         this.shadows.set(sessionId, shadow);
-        console.log('  ✅ Shadow created at', player.x, player.y);
         
         // Sprite
         const spriteKey = this.getSpriteKey(player.level);
-        console.log('  Sprite key:', spriteKey);
-        
         const sprite = this.add.sprite(player.x, player.y, spriteKey);
         sprite.setScale(0.6);
         sprite.play(this.getAnimKey(player.level, 'idle'));
-        sprite.setDepth(100);
-        
-        console.log('  ✅ Sprite created:', sprite.x, sprite.y, 'scale:', sprite.scale);
         
         this.playerSprites.set(sessionId, sprite);
-        
-        // DEBUG: Add bounding box
-        const bounds = sprite.getBounds();
-        const bbox = this.add.rectangle(bounds.centerX, bounds.centerY, bounds.width, bounds.height);
-        bbox.setStrokeStyle(3, isLocal ? 0x00ff00 : 0xffff00);
-        bbox.setDepth(99);
+        console.log(`✅ Player sprite created at (${player.x}, ${player.y})`);
         
         // Name tag
         const nameText = this.add.text(player.x, player.y - 50, player.username, {
@@ -398,32 +298,20 @@ class GameScene extends Phaser.Scene {
             color: isLocal ? '#00ff00' : '#ffffff',
             stroke: '#000000',
             strokeThickness: 3
-        }).setOrigin(0.5).setDepth(200);
+        }).setOrigin(0.5);
         this.nameTexts.set(sessionId, nameText);
-        console.log('  ✅ Name tag created:', player.username);
         
         // Health bar
         const healthBar = this.add.graphics();
-        healthBar.setDepth(200);
         this.healthBars.set(sessionId, healthBar);
         
         if (isLocal) {
-            console.log('  🎮 THIS IS THE LOCAL PLAYER!');
+            console.log(`👤 This is my player! Setting as localPlayer`);
             this.localPlayer = player;
             this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
-            console.log('  📷 Camera now following player');
-            console.log('  📷 Camera target:', this.cameras.main.getFollowTarget());
             
             // Update HUD
             this.updateHUD();
-            
-            // DEBUG: Add a big indicator above local player
-            this.add.text(player.x, player.y - 150, '⬇️ YOU ARE HERE ⬇️', {
-                fontSize: '32px',
-                color: '#00ff00',
-                backgroundColor: '#000000',
-                fontStyle: 'bold'
-            }).setOrigin(0.5).setDepth(1000);
         }
         
         // Listen for changes
@@ -433,8 +321,6 @@ class GameScene extends Phaser.Scene {
                 this.updateHUD();
             }
         };
-        
-        console.log('👤 ============ PLAYER ADDED COMPLETE ============');
     }
     
     removePlayer(sessionId) {
@@ -459,7 +345,6 @@ class GameScene extends Phaser.Scene {
         sprite.setScale(0.5);
         sprite.play('goblin-idle');
         sprite.setTint(0xff6666);
-        sprite.setDepth(50);
         
         this.npcSprites.set(npcId, sprite);
         
