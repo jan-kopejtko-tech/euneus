@@ -80,8 +80,15 @@ class GameScene extends Phaser.Scene {
             ? 'ws://localhost:2567'
             : 'wss://euneus-production.up.railway.app';
         
+        console.log('🎯 Target server:', SERVER_URL);
+        console.log('👤 Username:', username);
+        
         try {
+            console.log('⏳ Creating Colyseus client...');
             this.client = new Colyseus.Client(SERVER_URL);
+            console.log('✅ Client created');
+            
+            console.log('⏳ Joining/creating room "ffa"...');
             this.room = await this.client.joinOrCreate("ffa", { username: username });
             
             this.mySessionId = this.room.sessionId;

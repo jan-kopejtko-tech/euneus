@@ -104,7 +104,10 @@ type("number")(GameState.prototype, "tick");
 class FFARoom extends Room {
   
   onCreate(options) {
-    console.log("ðŸŽ® FFA Room Created!");
+    console.log("Ã°Å¸Å½Â® FFA Room Created!");
+    console.log("📝 Room options:", options);
+    console.log("🔧 Max clients: 200");
+    
     
     this.setState(new GameState());
     this.maxClients = 200;
@@ -161,7 +164,10 @@ class FFARoom extends Room {
   }
   
   onJoin(client, options) {
-    console.log(`âœ… ${options.username || "Player"} joined`);
+    console.log(`👋 Player joining...`);
+    console.log(`   Session: ${client.sessionId}`);
+    console.log(`   Username: ${options.username || "Player"}`);
+    console.log(`Ã¢Å“â€¦ ${options.username || "Player"} joined`);
     
     // Random spawn position
     const player = new Player(
@@ -181,12 +187,12 @@ class FFARoom extends Room {
   }
   
   onLeave(client, consented) {
-    console.log(`âŒ Player ${client.sessionId} left`);
+    console.log(`Ã¢ÂÅ’ Player ${client.sessionId} left`);
     this.state.players.delete(client.sessionId);
   }
   
   onDispose() {
-    console.log("ðŸ›‘ FFA Room Disposed");
+    console.log("Ã°Å¸â€ºâ€˜ FFA Room Disposed");
     this.npcSpawnTimer.clear();
   }
   
