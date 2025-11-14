@@ -21,7 +21,7 @@ class GameScene extends Phaser.Scene {
     }
     
     create() {
-        console.log('🎮 Game Scene Started (AGAR.IO STYLE - Client Authoritative)');
+        console.log('ðŸŽ® Game Scene Started (AGAR.IO STYLE - Client Authoritative)');
         
         this.WORLD_WIDTH = GameConfig.WORLD_WIDTH;
         this.WORLD_HEIGHT = GameConfig.WORLD_HEIGHT;
@@ -74,7 +74,7 @@ class GameScene extends Phaser.Scene {
     }
     
     async connectToServer() {
-        console.log('🔌 Connecting to server...');
+        console.log('ðŸ”Œ Connecting to server...');
         
         const SERVER_URL = window.location.hostname === 'localhost' 
             ? 'ws://localhost:2567'
@@ -85,14 +85,14 @@ class GameScene extends Phaser.Scene {
             this.room = await this.client.joinOrCreate("ffa", { username: username });
             
             this.mySessionId = this.room.sessionId;
-            console.log('✅ Connected! Session:', this.mySessionId);
+            console.log('âœ… Connected! Session:', this.mySessionId);
             
             this.room.onMessage("init", (message) => {
-                console.log('📨 Init message received');
+                console.log('ðŸ“¨ Init message received');
             });
             
             this.room.onStateChange.once((state) => {
-                console.log('📊 Initial state received');
+                console.log('ðŸ“Š Initial state received');
                 
                 state.players.forEach((player, sessionId) => {
                     this.addPlayer(sessionId, player);
@@ -102,7 +102,7 @@ class GameScene extends Phaser.Scene {
                     this.addNPC(npcId, npc);
                 });
                 
-                console.log('✅ CLIENT-AUTHORITATIVE MODE ACTIVE');
+                console.log('âœ… CLIENT-AUTHORITATIVE MODE ACTIVE');
             });
             
             this.room.state.players.onAdd = (player, sessionId) => {
@@ -149,7 +149,7 @@ class GameScene extends Phaser.Scene {
             });
             
         } catch (e) {
-            console.error('❌ Connection failed:', e);
+            console.error('âŒ Connection failed:', e);
             alert('Failed to connect to server!');
         }
     }
@@ -251,7 +251,7 @@ class GameScene extends Phaser.Scene {
         this.healthBars.set(sessionId, healthBar);
         
         if (isLocal) {
-            console.log('👤 This is MY player! I control movement!');
+            console.log('ðŸ‘¤ This is MY player! I control movement!');
             this.localPlayer = player;
             this.localPlayerSprite = sprite;
             
@@ -500,7 +500,49 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.shake(100, 0.003);
     }
     
-    showCollisionEffect(p1Id, p2Id) {
+
+    showSlashEffect(x, y, angle) {
+        const stage = GameConfig.EVOLUTION_STAGES[Math.min(this.localPlayer.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
+        const range = GameConfig.ATTACK_RANGE * stage.scale * 0.6;
+        const arc = GameConfig.ATTACK_ARC;
+        
+        // Create arc graphics
+        const graphics = this.add.graphics();
+        graphics.lineStyle(8, 0xffffff, 0.8);
+        graphics.fillStyle(0xffff00, 0.3);
+        
+        // Draw the attack arc
+        graphics.beginPath();
+        graphics.moveTo(x, y);
+        graphics.arc(x, y, range, angle - arc / 2, angle + arc / 2, false);
+        graphics.lineTo(x, y);
+        graphics.closePath();
+        graphics.fillPath();
+        graphics.strokePath();
+        
+        // Add slash lines for effect
+        for (let i = 0; i < 3; i++) {
+            const lineAngle = angle - arc / 2 + (arc * i / 2);
+            const endX = x + Math.cos(lineAngle) * range;
+            const endY = y + Math.sin(lineAngle) * range;
+            
+            graphics.lineStyle(4, 0xffffff, 0.6);
+            graphics.beginPath();
+            graphics.moveTo(x, y);
+            graphics.lineTo(endX, endY);
+            graphics.strokePath();
+        }
+        
+        // Fade out the effect
+        this.tweens.add({
+            targets: graphics,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => graphics.destroy()
+        });
+    }
+
+        showCollisionEffect(p1Id, p2Id) {
         const s1 = this.playerSprites.get(p1Id);
         const s2 = this.playerSprites.get(p2Id);
         
@@ -620,6 +662,7 @@ class GameScene extends Phaser.Scene {
         // Handle attacks
         if (this.input.activePointer.isDown && this.localPlayer.attackCooldown <= 0) {
             this.room.send("attack", { angle: this.myPosition.angle });
+            this.showSlashEffect(this.myPosition.x, this.myPosition.y, this.myPosition.angle);
         }
         
         // Handle jump
