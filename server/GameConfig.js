@@ -4,8 +4,8 @@ const GameConfig = {
     WORLD_HEIGHT: 3000,
     TICK_RATE: 20,
     GRAVITY: 9.8,
-    FRICTION: 0.9,
-    BASE_SPEED: 180,
+    FRICTION: 0.85, // More friction = stops faster
+    BASE_SPEED: 120, // Reduced from 180
     BASE_HP: 50,
     BASE_DAMAGE: 10,
     BASE_SIZE: 0.8,
@@ -16,16 +16,16 @@ const GameConfig = {
     BACKSTAB_MULTIPLIER: 1.5,
     KNOCKBACK_FORCE: 150,
     EVOLUTION_STAGES: [
-        { level: 1, name: "Peasant", sprite: "pawn", scale: 0.8, hp: 50, damage: 10, speed: 180 },
-        { level: 2, name: "Militia", sprite: "pawn", scale: 0.9, hp: 75, damage: 12, speed: 190 },
-        { level: 3, name: "Footman", sprite: "warrior", scale: 1.0, hp: 100, damage: 15, speed: 200 },
-        { level: 4, name: "Veteran", sprite: "warrior", scale: 1.1, hp: 125, damage: 18, speed: 205 },
-        { level: 5, name: "Knight", sprite: "warrior", scale: 1.2, hp: 150, damage: 22, speed: 210 },
-        { level: 6, name: "Elite Knight", sprite: "warrior", scale: 1.3, hp: 180, damage: 26, speed: 215 },
-        { level: 7, name: "Champion", sprite: "warrior", scale: 1.4, hp: 210, damage: 30, speed: 220 },
-        { level: 8, name: "Lord", sprite: "warrior", scale: 1.5, hp: 250, damage: 35, speed: 220 },
-        { level: 9, name: "Hero", sprite: "warrior", scale: 1.6, hp: 300, damage: 40, speed: 220 },
-        { level: 10, name: "Legend", sprite: "warrior", scale: 1.8, hp: 400, damage: 50, speed: 220 }
+        { level: 1, name: "Peasant", sprite: "pawn", scale: 0.8, hp: 50, damage: 10, speed: 120 },
+        { level: 2, name: "Militia", sprite: "pawn", scale: 0.9, hp: 75, damage: 12, speed: 130 },
+        { level: 3, name: "Footman", sprite: "warrior", scale: 1.0, hp: 100, damage: 15, speed: 135 },
+        { level: 4, name: "Veteran", sprite: "warrior", scale: 1.1, hp: 125, damage: 18, speed: 140 },
+        { level: 5, name: "Knight", sprite: "warrior", scale: 1.2, hp: 150, damage: 22, speed: 145 },
+        { level: 6, name: "Elite Knight", sprite: "warrior", scale: 1.3, hp: 180, damage: 26, speed: 145 },
+        { level: 7, name: "Champion", sprite: "warrior", scale: 1.4, hp: 210, damage: 30, speed: 145 },
+        { level: 8, name: "Lord", sprite: "warrior", scale: 1.5, hp: 250, damage: 35, speed: 145 },
+        { level: 9, name: "Hero", sprite: "warrior", scale: 1.6, hp: 300, damage: 40, speed: 145 },
+        { level: 10, name: "Legend", sprite: "warrior", scale: 1.8, hp: 400, damage: 50, speed: 145 }
     ],
     XP_PER_LEVEL: 100,
     XP_LEVEL_MULTIPLIER: 1.5,
