@@ -1,6 +1,6 @@
 const { Room } = require("@colyseus/core");
 const { Schema, MapSchema, type } = require("@colyseus/schema");
-const GameConfig = require("../GameConfig");
+const GameConfig = require("../GameConfig"); // Fixed path
 
 // Player state schema
 class Player extends Schema {
@@ -111,7 +111,6 @@ class FFARoom extends Room {
     
     // Spawn initial NPCs
     this.spawnNPCs(GameConfig.NPC_COUNT);
-    console.log(`✅ Spawned ${GameConfig.NPC_COUNT} NPCs`);
     
     // Message handlers
     this.onMessage("input", (client, message) => {
@@ -162,30 +161,16 @@ class FFARoom extends Room {
   }
   
   onJoin(client, options) {
-    console.log(`✅ ${options.username || "Player"} joined (${client.sessionId})`);
+    console.log(`✅ ${options.username || "Player"} joined`);
     
     // Random spawn position
-    const spawnX = Math.random() * GameConfig.WORLD_WIDTH;
-    const spawnY = Math.random() * GameConfig.WORLD_HEIGHT;
-    
-    console.log(`  Spawning at: ${Math.round(spawnX)}, ${Math.round(spawnY)}`);
-    
     const player = new Player(
-      spawnX,
-      spawnY,
+      Math.random() * GameConfig.WORLD_WIDTH,
+      Math.random() * GameConfig.WORLD_HEIGHT,
       options.username || `Player${Math.floor(Math.random() * 1000)}`
     );
     
-    console.log(`  Player object created:`, {
-      x: Math.round(player.x),
-      y: Math.round(player.y),
-      username: player.username,
-      hp: player.hp,
-      level: player.level
-    });
-    
     this.state.players.set(client.sessionId, player);
-    console.log(`  Player added to state. Total players: ${this.state.players.size}`);
     
     // Send initial info
     client.send("init", {
@@ -193,8 +178,6 @@ class FFARoom extends Room {
       worldWidth: GameConfig.WORLD_WIDTH,
       worldHeight: GameConfig.WORLD_HEIGHT
     });
-    
-    console.log(`  Sent init message to client`);
   }
   
   onLeave(client, consented) {

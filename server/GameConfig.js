@@ -1,4 +1,4 @@
-// Shared game configuration - NO imports, just data!
+// Game configuration shared between client and server
 const GameConfig = {
     WORLD_WIDTH: 4000,
     WORLD_HEIGHT: 3000,
@@ -60,5 +60,9 @@ const GameConfig = {
     }
 };
 
-// Export for Node.js
-module.exports = GameConfig;
+// For Node.js (server)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = GameConfig;
+}
+
+// For browser (client) - will be available as global GameConfig in index.html
