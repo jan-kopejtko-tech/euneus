@@ -1,6 +1,6 @@
 const { Room } = require("@colyseus/core");
 const { Schema, MapSchema, type } = require("@colyseus/schema");
-const GameConfig = require("./GameConfig");
+const GameConfig = require("../GameConfig");
 
 // Player state schema
 class Player extends Schema {
