@@ -187,11 +187,17 @@ class GameScene extends Phaser.Scene {
     async connectToServer() {
         console.log('🔌 ============ CONNECTING TO SERVER ============');
         
-        const SERVER_URL = window.location.hostname === 'localhost' 
-            ? 'ws://localhost:2567'
-            : 'wss://euneus-production.up.railway.app';
+        // Determine server URL based on environment
+        let SERVER_URL;
+        if (window.location.hostname === 'localhost') {
+            SERVER_URL = 'ws://localhost:2567';
+        } else {
+            // Production - Railway provides the public domain
+            SERVER_URL = 'wss://euneus-production.up.railway.app';
+        }
         
         console.log('🌐 Server URL:', SERVER_URL);
+        console.log('🌐 Current hostname:', window.location.hostname);
         
         try {
             this.client = new Colyseus.Client(SERVER_URL);
