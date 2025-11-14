@@ -105,10 +105,13 @@ class GameScene extends Phaser.Scene {
             this.room = await this.client.joinOrCreate("ffa", { username: username });
             console.log('✅ Connected to room');
             
-            // Handle initial connection message
+            // CRITICAL: Get session ID immediately from room
+            this.mySessionId = this.room.sessionId;
+            console.log('🎮 My session ID:', this.mySessionId);
+            
+            // Handle init message (just for compatibility)
             this.room.onMessage("init", (message) => {
-                this.mySessionId = message.sessionId;
-                console.log('🎮 My session ID:', this.mySessionId);
+                console.log('📨 Received init message (already have session ID)');
             });
             
             // CRITICAL FIX: Wait for the initial state to be fully synchronized
@@ -120,15 +123,16 @@ class GameScene extends Phaser.Scene {
                 // Add all existing entities
                 state.players.forEach((player, sessionId) => {
                     console.log('➕ Adding existing player:', sessionId, player.username);
+                    console.log('   Is this me?', sessionId === this.mySessionId);
                     this.addPlayer(sessionId, player);
                 });
                 
                 state.npcs.forEach((npc, npcId) => {
-                    console.log('➕ Adding existing NPC:', npcId);
                     this.addNPC(npcId, npc);
                 });
                 
                 console.log('✅ Initial state synchronized');
+                console.log('📷 Camera following:', this.localPlayer ? 'YES' : 'NO');
             });
             
             // Listen for future additions/removals
@@ -275,6 +279,8 @@ class GameScene extends Phaser.Scene {
     
     addPlayer(sessionId, player) {
         console.log(`➕ Adding player sprite for ${sessionId} (${player.username})`);
+        console.log(`   mySessionId: ${this.mySessionId}`);
+        console.log(`   isLocal: ${sessionId === this.mySessionId}`);
         
         const isLocal = sessionId === this.mySessionId;
         
@@ -306,9 +312,11 @@ class GameScene extends Phaser.Scene {
         this.healthBars.set(sessionId, healthBar);
         
         if (isLocal) {
-            console.log(`👤 This is my player! Setting as localPlayer`);
+            console.log(`👤 This is MY player! Setting up camera follow`);
             this.localPlayer = player;
             this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+            console.log(`📷 Camera now following sprite at (${sprite.x}, ${sprite.y})`);
+            console.log(`📷 Camera position: (${this.cameras.main.scrollX}, ${this.cameras.main.scrollY})`);
             
             // Update HUD
             this.updateHUD();
