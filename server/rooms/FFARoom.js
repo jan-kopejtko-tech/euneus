@@ -433,6 +433,8 @@ class FFARoom extends Room {
     const attacker = this.state.players.get(attackerId);
     if (!attacker || attacker.hp <= 0) return;
     
+    console.log(`⚔️ Attack from ${attacker.username} at (${attacker.x.toFixed(0)}, ${attacker.y.toFixed(0)}) angle: ${angle.toFixed(2)}`);
+    
     attacker.isAttacking = true;
     attacker.attackCooldown = GameConfig.ATTACK_COOLDOWN;
     
@@ -440,6 +442,8 @@ class FFARoom extends Room {
     const range = GameConfig.ATTACK_RANGE * stage.scale;
     const arc = GameConfig.ATTACK_ARC;
     let damage = stage.damage;
+    
+    console.log(`  Range: ${range.toFixed(0)}, Arc: ${arc.toFixed(2)}, Damage: ${damage}`);
     
     // Class modifiers
     if (attacker.class === "berserker") {
@@ -491,11 +495,13 @@ class FFARoom extends Room {
     }
     
     // Check NPCs
+    let npcsInRange = 0;
     for (let [npcId, npc] of this.state.npcs) {
       const dx = npc.x - attacker.x;
       const dy = npc.y - attacker.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       
+      if (dist <= range) npcsInRange++;
       if (dist > range) continue;
       
       const angleToTarget = Math.atan2(dy, dx);
@@ -503,6 +509,7 @@ class FFARoom extends Room {
       if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
       
       if (angleDiff <= arc / 2) {
+        console.log(`  💥 HIT NPC at dist ${dist.toFixed(0)}, angleDiff ${angleDiff.toFixed(2)}, hp: ${npc.hp} -> ${npc.hp - damage}`);
         npc.hp -= damage;
         
         // Knockback
@@ -512,13 +519,14 @@ class FFARoom extends Room {
         this.broadcast("npc_hit", { npcId, damage });
         
         if (npc.hp <= 0) {
-          console.log(`NPC killed`);
+          console.log(`  ☠️ NPC killed`);
           this.state.npcs.delete(npcId);
           this.giveXP(attacker, GameConfig.NPC_XP_REWARD);
           this.broadcast("npc_killed", { npcId, killerId: attackerId });
         }
       }
     }
+    console.log(`  Total NPCs in range: ${npcsInRange}, Total NPCs: ${this.state.npcs.size}`);
   }
   
   checkDeath(victimId, victim, killerId) {
