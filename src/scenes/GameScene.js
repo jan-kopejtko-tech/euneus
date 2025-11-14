@@ -322,18 +322,33 @@ class GameScene extends Phaser.Scene {
             this.updateHUD();
         }
         
-        // Listen for changes
-        let changeCount = 0;
-        player.onChange = () => {
-            changeCount++;
-            if (isLocal && changeCount % 60 === 0) { // Log every 60 changes to avoid spam
-                console.log(`🔄 Player state changed ${changeCount} times`);
-            }
+        // Listen for changes - MUST listen to specific properties in Colyseus
+        player.listen("x", (currentValue, previousValue) => {
             this.updatePlayerSprite(sessionId, player);
+        });
+        player.listen("y", (currentValue, previousValue) => {
+            this.updatePlayerSprite(sessionId, player);
+        });
+        player.listen("vx", (currentValue, previousValue) => {
+            if (isLocal && Math.abs(currentValue) > 0) {
+                console.log('📍 vx changed:', currentValue);
+            }
+        });
+        player.listen("vy", (currentValue, previousValue) => {
+            if (isLocal && Math.abs(currentValue) > 0) {
+                console.log('📍 vy changed:', currentValue);
+            }
+        });
+        player.listen("hp", (currentValue, previousValue) => {
             if (isLocal) {
                 this.updateHUD();
             }
-        };
+        });
+        player.listen("level", (currentValue, previousValue) => {
+            if (isLocal) {
+                this.updateHUD();
+            }
+        });
     }
     
     removePlayer(sessionId) {
@@ -361,10 +376,13 @@ class GameScene extends Phaser.Scene {
         
         this.npcSprites.set(npcId, sprite);
         
-        npc.onChange = () => {
-            sprite.x = npc.x;
-            sprite.y = npc.y;
-        };
+        // Listen for position changes
+        npc.listen("x", (currentValue) => {
+            sprite.x = currentValue;
+        });
+        npc.listen("y", (currentValue) => {
+            sprite.y = currentValue;
+        });
     }
     
     removeNPC(npcId) {
