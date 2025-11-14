@@ -506,12 +506,10 @@ class GameScene extends Phaser.Scene {
         const range = GameConfig.ATTACK_RANGE * stage.scale * 0.6;
         const arc = GameConfig.ATTACK_ARC;
         
-        // Create arc graphics
         const graphics = this.add.graphics();
         graphics.lineStyle(8, 0xffffff, 0.8);
         graphics.fillStyle(0xffff00, 0.3);
         
-        // Draw the attack arc
         graphics.beginPath();
         graphics.moveTo(x, y);
         graphics.arc(x, y, range, angle - arc / 2, angle + arc / 2, false);
@@ -520,7 +518,6 @@ class GameScene extends Phaser.Scene {
         graphics.fillPath();
         graphics.strokePath();
         
-        // Add slash lines for effect
         for (let i = 0; i < 3; i++) {
             const lineAngle = angle - arc / 2 + (arc * i / 2);
             const endX = x + Math.cos(lineAngle) * range;
@@ -533,7 +530,6 @@ class GameScene extends Phaser.Scene {
             graphics.strokePath();
         }
         
-        // Fade out the effect
         this.tweens.add({
             targets: graphics,
             alpha: 0,
