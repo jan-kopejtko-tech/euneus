@@ -265,15 +265,17 @@ class GameScene extends Phaser.Scene {
             // For local player, only listen to server for validation/corrections
             player.listen("x", (serverX) => {
                 const error = Math.abs(this.myPosition.x - serverX);
-                if (error > 50) {
-                    console.warn(`Server corrected X by ${error.toFixed(0)}px`);
+                // Only correct if error is large (>150px = likely cheating or bad lag)
+                if (error > 150) {
+                    console.warn(`⚠️ Server corrected X by ${error.toFixed(0)}px`);
                     this.myPosition.x = serverX;
                 }
             });
             player.listen("y", (serverY) => {
                 const error = Math.abs(this.myPosition.y - serverY);
-                if (error > 50) {
-                    console.warn(`Server corrected Y by ${error.toFixed(0)}px`);
+                // Only correct if error is large (>150px = likely cheating or bad lag)
+                if (error > 150) {
+                    console.warn(`⚠️ Server corrected Y by ${error.toFixed(0)}px`);
                     this.myPosition.y = serverY;
                 }
             });
