@@ -195,6 +195,11 @@ class FFARoom extends Room {
     this.state.tick++;
     const dt = deltaTime / 1000; // Convert to seconds
     
+    // Debug: Log every second
+    if (this.state.tick % 20 === 0) {
+      console.log(`⚙️ Game loop tick ${this.state.tick}, players: ${this.state.players.size}, NPCs: ${this.state.npcs.size}`);
+    }
+    
     // 1. Process inputs
     this.processInputs(dt);
     
@@ -232,6 +237,11 @@ class FFARoom extends Room {
       if (inputMag > 0) {
         player.vx = (player.input.moveX / inputMag) * speed;
         player.vy = (player.input.moveY / inputMag) * speed;
+        
+        // Debug: Log occasionally
+        if (this.state.tick % 20 === 0) {
+          console.log(`🎮 Processing input for ${player.username}: moveX=${player.input.moveX}, moveY=${player.input.moveY}, vx=${player.vx.toFixed(1)}, vy=${player.vy.toFixed(1)}`);
+        }
       }
       
       // Jump
