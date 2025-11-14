@@ -3,27 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kingdom of Euneus</title>
-    
-    <!-- Phaser -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-    
-    <!-- Authentication System (LOAD FIRST) -->
-    <script src="authsystem.js"></script>
-    <script src="trialmonitor.js"></script>
-    <script src="levelblocker.js"></script>
-    
-    <!-- Game Systems -->
-    <script src="game-config.js"></script>
-    <script src="savesystem.js"></script>
-    <script src="gamedata.js"></script>
-    
-    <!-- Game Scenes -->
-    <script src="loginscene.js"></script>
-    <script src="menuscene.js"></script>
-    <script src="classselectscene.js"></script>
-    <script src="castlescene.js"></script>
-    <script src="battlescene.js"></script>
+    <title>Medieval FFA .io</title>
     
     <style>
         body {
@@ -37,716 +17,319 @@
             font-family: 'Arial', sans-serif;
             overflow: hidden;
         }
+        
         #game-container {
             box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
-            position: relative;
-        }
-        canvas {
-            display: block;
-            margin: 0 auto;
         }
         
-        /* Hero HUD Overlay */
-        #hero-hud {
+        canvas {
+            display: block;
+        }
+        
+        /* Leaderboard */
+        #leaderboard {
             position: fixed;
             top: 20px;
-            left: 20px;
-            z-index: 4000;
-            font-family: Arial, sans-serif;
-            pointer-events: none;
-            display: none;
-        }
-        #hero-hud .hud-panel {
-            background: rgba(0,0,0,0.8);
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
             padding: 15px;
             border-radius: 10px;
             border: 2px solid #ffd700;
-            min-width: 250px;
+            min-width: 200px;
+            color: white;
+            font-size: 14px;
+            z-index: 1000;
         }
-        #hero-hud .hero-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 10px;
-        }
-        #hero-icon {
-            font-size: 48px;
-        }
-        #hero-class {
+        
+        #leaderboard h3 {
+            margin: 0 0 10px 0;
             color: #ffd700;
-            font-size: 24px;
-            font-weight: bold;
+            text-align: center;
         }
-        #hero-level {
-            color: #00ff00;
-            font-size: 18px;
-        }
-        .stat-bar {
-            margin: 8px 0;
-        }
-        .stat-bar-header {
+        
+        .leaderboard-entry {
             display: flex;
             justify-content: space-between;
-            font-size: 14px;
-            color: white;
-            margin-bottom: 3px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .stat-bar-bg {
+        
+        .leaderboard-entry.you {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        /* Death screen */
+        #death-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 2000;
+        }
+        
+        #death-screen.active {
+            display: flex;
+        }
+        
+        #death-screen h1 {
+            color: #ff0000;
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        #death-screen .stats {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        
+        #respawn-btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #00aa00;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #respawn-btn:hover {
+            background: #00cc00;
+        }
+        
+        /* Menu screen */
+        #menu-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 3000;
+        }
+        
+        #menu-screen h1 {
+            color: #ffd700;
+            font-size: 72px;
+            margin-bottom: 40px;
+        }
+        
+        #username-input {
+            padding: 15px;
+            font-size: 20px;
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+            margin-bottom: 20px;
+            width: 300px;
+            text-align: center;
+        }
+        
+        #play-btn {
+            padding: 15px 60px;
+            font-size: 28px;
+            background: #00aa00;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #play-btn:hover {
+            background: #00cc00;
+        }
+        
+        /* Stats HUD */
+        #stats-hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+            color: white;
+            z-index: 1000;
+        }
+        
+        .stat-row {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        
+        .stat-label {
+            color: #ffd700;
+        }
+        
+        #hp-bar-container {
+            width: 200px;
             height: 20px;
             background: #333;
             border-radius: 10px;
             overflow: hidden;
+            margin-top: 5px;
         }
+        
         #hp-bar {
-            width: 100%;
             height: 100%;
             background: linear-gradient(90deg, #ff0000, #ff6b6b);
             transition: width 0.3s;
         }
+        
+        #xp-bar-container {
+            width: 200px;
+            height: 15px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
         #xp-bar {
-            width: 0%;
             height: 100%;
             background: linear-gradient(90deg, #ffd700, #ffaa00);
             transition: width 0.3s;
         }
-        .xp-bar-bg {
-            height: 15px;
-        }
-        .stats-grid {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #aaa;
-        }
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 3px 0;
-        }
-        .stat-row span:last-child {
-            color: white;
-        }
-        
-        /* Abilities Bar */
-        #abilities-bar {
-            margin-top: 15px;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            border-radius: 10px;
-            border: 2px solid #ffd700;
-        }
-        .abilities-container {
-            display: flex;
-            gap: 10px;
-        }
-        .ability {
-            width: 60px;
-            height: 60px;
-            background: #2a2a2a;
-            border: 2px solid #666;
-            border-radius: 8px;
-            position: relative;
-            cursor: pointer;
-        }
-        .ability-icon {
-            font-size: 32px;
-            text-align: center;
-            line-height: 56px;
-        }
-        .ability-key {
-            position: absolute;
-            bottom: 2px;
-            right: 4px;
-            font-size: 12px;
-            color: white;
-            font-weight: bold;
-        }
-        .ability-cooldown {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            border-radius: 6px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .ability-cooldown.active {
-            display: flex;
-        }
-        #abilities-description {
-            color: #aaa;
-            font-size: 11px;
-            margin-top: 5px;
-            text-align: center;
-        }
-        
-        /* DIABLO-STYLE ACTION BAR - ULTRA MINIMAL */
-        #diablo-action-bar {
-            position: fixed;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 450px;
-            height: 40px;
-            z-index: 5000;
-            pointer-events: all;
-            display: none;
-        }
-        
-        #action-bar-bg {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 40px;
-            background: linear-gradient(to top, 
-                rgba(20, 10, 0, 0.92) 0%, 
-                rgba(20, 10, 0, 0.7) 100%
-            );
-            border-top: 1px solid #8B4513;
-            box-shadow: 0 -2px 15px rgba(0, 0, 0, 0.7);
-        }
-        
-        /* HP GLOBE - ULTRA COMPACT */
-        .globe-container {
-            position: absolute;
-            bottom: 4px;
-            width: 32px;
-            height: 32px;
-        }
-        
-        .globe-container.left {
-            left: 4px;
-        }
-        
-        .globe-container.right {
-            right: 4px;
-        }
-        
-        .globe-bg {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, 
-                rgba(100, 0, 0, 0.3),
-                rgba(50, 0, 0, 0.6),
-                rgba(20, 0, 0, 0.9)
-            );
-            border: 1px solid #8B4513;
-            box-shadow: 
-                inset 0 0 8px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(255, 0, 0, 0.3);
-        }
-        
-        .globe-bg.mana {
-            background: radial-gradient(circle at 30% 30%, 
-                rgba(0, 50, 150, 0.3),
-                rgba(0, 30, 100, 0.6),
-                rgba(0, 10, 50, 0.9)
-            );
-            box-shadow: 
-                inset 0 0 8px rgba(0, 0, 0, 0.8),
-                0 0 8px rgba(0, 100, 255, 0.3);
-        }
-        
-        .globe-fill {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 100%;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%,
-                #ff6666,
-                #ff0000,
-                #aa0000
-            );
-            transition: height 0.3s ease;
-        }
-        
-        .globe-fill.mana {
-            background: radial-gradient(circle at 30% 30%,
-                #66aaff,
-                #0066ff,
-                #0044aa
-            );
-        }
-        
-        .globe-shine {
-            position: absolute;
-            top: 6%;
-            left: 18%;
-            width: 30%;
-            height: 30%;
-            border-radius: 50%;
-            background: radial-gradient(circle, 
-                rgba(255, 255, 255, 0.5),
-                rgba(255, 255, 255, 0) 70%
-            );
-            pointer-events: none;
-        }
-        
-        .globe-text {
-            display: none;
-        }
-        
-        /* CENTER PORTRAIT - ULTRA COMPACT */
-        #action-portrait {
-            position: absolute;
-            bottom: 6px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 28px;
-            height: 28px;
-            cursor: pointer;
-        }
-        
-        #portrait-bg {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle,
-                rgba(80, 60, 40, 0.9),
-                rgba(40, 30, 20, 1)
-            );
-            border: 1px solid #8B4513;
-            border-radius: 3px;
-            box-shadow: 
-                inset 0 0 8px rgba(0, 0, 0, 0.8),
-                0 0 6px rgba(255, 215, 0, 0.3);
-        }
-        
-        #portrait-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 16px;
-            filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
-        }
-        
-        #portrait-level {
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #ffd700;
-            padding: 0px 3px;
-            border-radius: 3px;
-            border: 1px solid #8B4513;
-            font-size: 7px;
-            font-weight: bold;
-            white-space: nowrap;
-        }
-        
-        /* ACTION SLOTS - ULTRA COMPACT */
-        .action-slots {
-            position: absolute;
-            bottom: 7px;
-            display: flex;
-            gap: 2px;
-        }
-        
-        .action-slots.left {
-            left: 40px;
-        }
-        
-        .action-slots.right {
-            right: 40px;
-        }
-        
-        .action-slot {
-            width: 26px;
-            height: 26px;
-            background: rgba(20, 10, 0, 0.8);
-            border: 1px solid #8B4513;
-            border-radius: 2px;
-            position: relative;
-            cursor: pointer;
-            transition: all 0.15s;
-            box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.8);
-        }
-        
-        .action-slot:hover {
-            border-color: #ffd700;
-            box-shadow: 
-                inset 0 0 4px rgba(0, 0, 0, 0.8),
-                0 0 5px rgba(255, 215, 0, 0.5);
-        }
-        
-        .action-slot-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 14px;
-            filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
-        }
-        
-        .action-slot-key {
-            position: absolute;
-            bottom: 0px;
-            right: 1px;
-            color: #ffd700;
-            font-size: 6px;
-            font-weight: bold;
-            text-shadow: 0 0 2px #000;
-        }
-        
-        .action-slot-cooldown {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            border-radius: 2px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 10px;
-            font-weight: bold;
-        }
-        
-        .action-slot-cooldown.active {
-            display: flex;
-        }
-        
-        /* MENU BUTTONS - ULTRA COMPACT */
-        #action-menu-buttons {
-            position: absolute;
-            bottom: 1px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 3px;
-        }
-        
-        .menu-btn {
-            width: 32px;
-            height: 11px;
-            background: rgba(40, 20, 10, 0.9);
-            border: 1px solid #8B4513;
-            border-radius: 2px;
-            color: #ffd700;
-            font-size: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.15s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-shadow: 0 0 2px #000;
-        }
-        
-        .menu-btn:hover {
-            background: rgba(60, 30, 15, 1);
-            border-color: #ffd700;
-            box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
-        }
     </style>
 </head>
 <body>
-    <!-- Hero HUD Overlay -->
-    <div id="hero-hud">
-        <div class="hud-panel">
-            <div class="hero-header">
-                <div id="hero-icon"></div>
-                <div>
-                    <div id="hero-class"></div>
-                    <div id="hero-level"></div>
-                </div>
-            </div>
-            
-            <!-- HP Bar -->
-            <div class="stat-bar">
-                <div class="stat-bar-header">
-                    <span id="hp-label">HP</span>
-                    <span id="hp-text">100/100</span>
-                </div>
-                <div class="stat-bar-bg">
-                    <div id="hp-bar"></div>
-                </div>
-            </div>
-            
-            <!-- XP Bar -->
-            <div class="stat-bar">
-                <div class="stat-bar-header">
-                    <span id="xp-label">XP</span>
-                    <span id="xp-text">0/100</span>
-                </div>
-                <div class="stat-bar-bg xp-bar-bg">
-                    <div id="xp-bar"></div>
-                </div>
-            </div>
-            
-            <!-- Stats -->
-            <div class="stats-grid">
-                <div class="stat-row">
-                    <span id="damage-label">âš”ï¸ Damage</span>
-                    <span id="stat-damage">20</span>
-                </div>
-                <div class="stat-row">
-                    <span id="speed-label">ðŸ’¨ Speed</span>
-                    <span id="stat-speed">220</span>
-                </div>
-                <div class="stat-row">
-                    <span id="range-label">ðŸŽ¯ Range</span>
-                    <span id="stat-range">80</span>
-                </div>
-                <div class="stat-row">
-                    <span id="army-label">ðŸ‘¥ Army</span>
-                    <span id="stat-army">1</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Abilities -->
-        <div id="abilities-bar">
-            <div class="abilities-container">
-                <div class="ability" data-key="W">
-                    <div class="ability-icon ability-icon-dash">â†‘</div>
-                    <div class="ability-key">W</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="A">
-                    <div class="ability-icon ability-icon-dash">â†</div>
-                    <div class="ability-key">A</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="S">
-                    <div class="ability-icon ability-icon-dash">â†“</div>
-                    <div class="ability-key">S</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="D">
-                    <div class="ability-icon ability-icon-dash">â†’</div>
-                    <div class="ability-key">D</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="E">
-                    <div class="ability-icon ability-icon-aoe">ðŸ’¥</div>
-                    <div class="ability-key">E</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-            </div>
-            <div id="abilities-description">WASD - Dash | E - AOE | LClick - Attack</div>
-        </div>
+    <!-- Menu Screen -->
+    <div id="menu-screen">
+        <h1>⚔️ Medieval FFA ⚔️</h1>
+        <input type="text" id="username-input" placeholder="Enter your name" maxlength="15" value="Warrior">
+        <button id="play-btn">PLAY</button>
     </div>
     
-    <!-- DIABLO-STYLE ACTION BAR -->
-    <div id="diablo-action-bar">
-        <!-- Background -->
-        <div id="action-bar-bg"></div>
-        
-        <!-- HP Globe (Left) -->
-        <div class="globe-container left">
-            <div class="globe-bg">
-                <div class="globe-fill" id="hp-globe-fill"></div>
-                <div class="globe-shine"></div>
-            </div>
-            <div class="globe-text" id="hp-globe-text">100/100</div>
-        </div>
-        
-        <!-- Mana Globe (Right) -->
-        <div class="globe-container right">
-            <div class="globe-bg mana">
-                <div class="globe-fill mana" id="mana-globe-fill"></div>
-                <div class="globe-shine"></div>
-            </div>
-            <div class="globe-text" id="mana-globe-text">100/100</div>
-        </div>
-        
-        <!-- Center Portrait -->
-        <div id="action-portrait">
-            <div id="portrait-bg"></div>
-            <div id="portrait-icon">ðŸ¤´</div>
-            <div id="portrait-level">Level 1</div>
-        </div>
-        
-        <!-- Left Action Slots (WASD) -->
-        <div class="action-slots left">
-            <div class="action-slot" data-key="W">
-                <div class="action-slot-icon">â†‘</div>
-                <div class="action-slot-key">W</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-            <div class="action-slot" data-key="A">
-                <div class="action-slot-icon">â†</div>
-                <div class="action-slot-key">A</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-            <div class="action-slot" data-key="S">
-                <div class="action-slot-icon">â†“</div>
-                <div class="action-slot-key">S</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-            <div class="action-slot" data-key="D">
-                <div class="action-slot-icon">â†’</div>
-                <div class="action-slot-key">D</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-        </div>
-        
-        <!-- Right Action Slots (E + items) -->
-        <div class="action-slots right">
-            <div class="action-slot" data-key="E">
-                <div class="action-slot-icon">ðŸ’¥</div>
-                <div class="action-slot-key">E</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-            <div class="action-slot" data-key="1">
-                <div class="action-slot-icon">ðŸ§ª</div>
-                <div class="action-slot-key">1</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-            <div class="action-slot" data-key="2">
-                <div class="action-slot-icon"></div>
-                <div class="action-slot-key">2</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-            <div class="action-slot" data-key="3">
-                <div class="action-slot-icon"></div>
-                <div class="action-slot-key">3</div>
-                <div class="action-slot-cooldown"></div>
-            </div>
-        </div>
-        
-        <!-- Menu Buttons -->
-        <div id="action-menu-buttons">
-            <div class="menu-btn" id="btn-character">CHAR</div>
-            <div class="menu-btn" id="btn-skills">SKILLS</div>
-            <div class="menu-btn" id="btn-inventory">INV</div>
-        </div>
-    </div>
-    
-    <div id="game-container"></div>
-    <div id="hero-hud">
-        <div class="hud-panel">
-            <div class="hero-header">
-                <div id="hero-icon"></div>
-                <div>
-                    <div id="hero-class"></div>
-                    <div id="hero-level"></div>
-                </div>
-            </div>
-            
-            <!-- HP Bar -->
-            <div class="stat-bar">
-                <div class="stat-bar-header">
-                    <span id="hp-label">HP</span>
-                    <span id="hp-text">100/100</span>
-                </div>
-                <div class="stat-bar-bg">
-                    <div id="hp-bar"></div>
-                </div>
-            </div>
-            
-            <!-- XP Bar -->
-            <div class="stat-bar">
-                <div class="stat-bar-header">
-                    <span id="xp-label">XP</span>
-                    <span id="xp-text">0/100</span>
-                </div>
-                <div class="stat-bar-bg xp-bar-bg">
-                    <div id="xp-bar"></div>
-                </div>
-            </div>
-            
-            <!-- Stats -->
-            <div class="stats-grid">
-                <div class="stat-row">
-                    <span id="damage-label">ÃƒÂ¢Ã…Â¡Ã¢â‚¬ÂÃƒÂ¯Ã‚Â¸Ã‚Â Damage</span>
-                    <span id="stat-damage">20</span>
-                </div>
-                <div class="stat-row">
-                    <span id="speed-label">ÃƒÂ°Ã…Â¸Ã‚ÂÃ†â€™ Speed</span>
-                    <span id="stat-speed">220</span>
-                </div>
-                <div class="stat-row">
-                    <span id="range-label">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¯ Range</span>
-                    <span id="stat-range">80</span>
-                </div>
-                <div class="stat-row">
-                    <span id="army-label">ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¥ Army</span>
-                    <span id="stat-army">1</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Abilities -->
-        <div id="abilities-bar">
-            <div class="abilities-container">
-                <div class="ability" data-key="W">
-                    <div class="ability-icon ability-icon-dash">â†‘</div>
-                    <div class="ability-key">W</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="A">
-                    <div class="ability-icon ability-icon-dash">â†</div>
-                    <div class="ability-key">A</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="S">
-                    <div class="ability-icon ability-icon-dash">â†“</div>
-                    <div class="ability-key">S</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="D">
-                    <div class="ability-icon ability-icon-dash">â†’</div>
-                    <div class="ability-key">D</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-                <div class="ability" data-key="E">
-                    <div class="ability-icon ability-icon-aoe">ðŸ’¥</div>
-                    <div class="ability-key">E</div>
-                    <div class="ability-cooldown"></div>
-                </div>
-            </div>
-            <div id="abilities-description">WASD - Dash | E - AOE | LClick - Attack</div>
-        </div>
-    </div>
-    
+    <!-- Game Container -->
     <div id="game-container"></div>
     
+    <!-- Stats HUD -->
+    <div id="stats-hud" style="display: none;">
+        <div class="stat-row">
+            <span class="stat-label">Name:</span> <span id="player-name"></span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Level:</span> <span id="player-level">1</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">HP:</span> <span id="player-hp">50/50</span>
+        </div>
+        <div id="hp-bar-container">
+            <div id="hp-bar" style="width: 100%;"></div>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">XP:</span> <span id="player-xp">0/100</span>
+        </div>
+        <div id="xp-bar-container">
+            <div id="xp-bar" style="width: 0%;"></div>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Kills:</span> <span id="player-kills">0</span>
+        </div>
+    </div>
+    
+    <!-- Leaderboard -->
+    <div id="leaderboard" style="display: none;">
+        <h3>🏆 LEADERBOARD 🏆</h3>
+        <div id="leaderboard-list"></div>
+    </div>
+    
+    <!-- Death Screen -->
+    <div id="death-screen">
+        <h1>☠️ YOU DIED ☠️</h1>
+        <div class="stats">
+            <div>Level Reached: <span id="final-level">5</span></div>
+            <div>Kills: <span id="final-kills">12</span></div>
+        </div>
+        <button id="respawn-btn">RESPAWN</button>
+    </div>
+    
+    <!-- Phaser 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    
+    <!-- Colyseus Client - Using specific working version -->
+    <script type="text/javascript" src="https://unpkg.com/colyseus.js@0.14.13/dist/colyseus.js"></script>
+    
+    <!-- Game Config (Inline) -->
     <script>
-        // Phaser game configuration
-        const config = {
-            type: Phaser.AUTO,
-            width: 1200,
-            height: 800,
-            parent: 'game-container',
-            backgroundColor: '#1a1a2e',
-            physics: {
-                default: 'arcade',
-                arcade: {
-                    gravity: { y: 0 },
-                    debug: false
+        const GameConfig = {
+            WORLD_WIDTH: 4000,
+            WORLD_HEIGHT: 3000,
+            TICK_RATE: 20,
+            GRAVITY: 9.8,
+            FRICTION: 0.9,
+            BASE_SPEED: 180,
+            BASE_HP: 50,
+            BASE_DAMAGE: 10,
+            BASE_SIZE: 0.8,
+            JUMP_FORCE: 25,
+            ATTACK_COOLDOWN: 400,
+            ATTACK_RANGE: 80,
+            ATTACK_ARC: Math.PI / 3,
+            BACKSTAB_MULTIPLIER: 1.5,
+            KNOCKBACK_FORCE: 150,
+            EVOLUTION_STAGES: [
+                { level: 1, name: "Peasant", sprite: "pawn", scale: 0.8, hp: 50, damage: 10, speed: 180 },
+                { level: 2, name: "Militia", sprite: "pawn", scale: 0.9, hp: 75, damage: 12, speed: 190 },
+                { level: 3, name: "Footman", sprite: "warrior", scale: 1.0, hp: 100, damage: 15, speed: 200 },
+                { level: 4, name: "Veteran", sprite: "warrior", scale: 1.1, hp: 125, damage: 18, speed: 205 },
+                { level: 5, name: "Knight", sprite: "warrior", scale: 1.2, hp: 150, damage: 22, speed: 210 },
+                { level: 6, name: "Elite Knight", sprite: "warrior", scale: 1.3, hp: 180, damage: 26, speed: 215 },
+                { level: 7, name: "Champion", sprite: "warrior", scale: 1.4, hp: 210, damage: 30, speed: 220 },
+                { level: 8, name: "Lord", sprite: "warrior", scale: 1.5, hp: 250, damage: 35, speed: 220 },
+                { level: 9, name: "Hero", sprite: "warrior", scale: 1.6, hp: 300, damage: 40, speed: 220 },
+                { level: 10, name: "Legend", sprite: "warrior", scale: 1.8, hp: 400, damage: 50, speed: 220 }
+            ],
+            XP_PER_LEVEL: 100,
+            XP_LEVEL_MULTIPLIER: 1.5,
+            NPC_XP_REWARD: 10,
+            PLAYER_XP_STEAL: 0.5,
+            ASSASSINATION_BONUS: 1.0,
+            NPC_COUNT: 80,
+            NPC_SPAWN_RATE: 3000,
+            NPC_SPAWN_BATCH: 5,
+            NPC_HP: 30,
+            NPC_SPEED: 80,
+            NPC_DAMAGE: 5,
+            CLASSES: {
+                berserker: {
+                    name: "Berserker",
+                    speedBonus: 1.3,
+                    damageBonus: 1.2,
+                    hpPenalty: 0.8
+                },
+                paladin: {
+                    name: "Paladin",
+                    speedPenalty: 0.85,
+                    hpBonus: 1.4,
+                    regenRate: 2
+                },
+                assassin: {
+                    name: "Assassin",
+                    speedBonus: 1.15,
+                    sizeBonus: 0.85,
+                    backstabBonus: 2.0
                 }
-            },
-            scene: [
-                LoginScene,
-                MenuScene,
-                ClassSelectScene,
-                CastleScene,
-                BattleScene
-            ]
+            }
         };
-        
-        // Start the game
-        const game = new Phaser.Game(config);
-        
-        console.log('ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â® Kingdom of Euneus - Game Started');
-        console.log('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¦ Version: 1.0.0');
     </script>
+    
+    <!-- Game Scenes -->
+    <script src="src/scenes/GameScene.js"></script>
+    
+    <!-- Main Entry -->
+    <script src="src/main.js"></script>
 </body>
 </html>

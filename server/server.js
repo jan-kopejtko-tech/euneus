@@ -2,54 +2,54 @@ const { Server } = require("@colyseus/core");
 const { WebSocketTransport } = require("@colyseus/ws-transport");
 const express = require("express");
 const cors = require("cors");
-const { BattleRoom } = require("./rooms/BattleRoom");
+const { FFARoom } = require("./rooms/FFARoom");
 
 const port = process.env.PORT || 2567;
 const app = express();
 
-// Enable CORS for your Vercel domain
+// CORS for local development and production
 app.use(cors({
   origin: [
-    'https://euneus-9c6xjo3vz-jans-projects-e4f89011.vercel.app',
+    'http://localhost:8000',
     'http://localhost:3000',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'https://euneus-9c6xjo3vz-jans-projects-e4f89011.vercel.app',
+    process.env.CLIENT_URL // For future domain changes
   ],
   credentials: true
 }));
 
 app.use(express.json());
 
-// Create game server first (before the health check so we can reference it)
+// Create Colyseus server
 const gameServer = new Server({
   transport: new WebSocketTransport({
     server: app.listen(port, () => {
-      console.log(`🎮 Euneus Server listening on port ${port}`);
+      console.log(`🎮 FFA Server running on port ${port}`);
       console.log(`🌐 WebSocket: ws://localhost:${port}`);
     })
   })
 });
 
 // Define game room
-gameServer.define("battle", BattleRoom);
+gameServer.define("ffa", FFARoom);
 
-// Health check endpoint (after gameServer is defined)
+// Health check
 app.get("/", (req, res) => {
   res.json({ 
-    status: "Euneus Game Server Running",
-    version: "1.0.0",
-    rooms: gameServer.rooms.size
+    status: "FFA Server Running",
+    rooms: gameServer.rooms.size,
+    timestamp: Date.now()
   });
 });
 
-console.log("✅ Server initialized!");
-
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully...');
+  console.log('Shutting down...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully...');
+  console.log('Shutting down...');
   process.exit(0);
 });
