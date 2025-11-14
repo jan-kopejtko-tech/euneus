@@ -1,6 +1,6 @@
 const { Room } = require("@colyseus/core");
 const { Schema, MapSchema, type } = require("@colyseus/schema");
-const GameConfig = require("../../shared/GameConfig");
+const GameConfig = require("./GameConfig");
 
 // Player state schema
 class Player extends Schema {
@@ -478,7 +478,7 @@ class FFARoom extends Room {
         this.broadcast("npc_hit", { npcId, damage });
         
         if (npc.hp <= 0) {
-          console.log(`💀 NPC ${npcId} killed`);
+          console.log(`NPC killed`);
           this.state.npcs.delete(npcId);
           this.giveXP(attacker, GameConfig.NPC_XP_REWARD);
           this.broadcast("npc_killed", { npcId, killerId: attackerId });

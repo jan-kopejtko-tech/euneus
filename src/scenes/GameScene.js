@@ -4,34 +4,25 @@ class GameScene extends Phaser.Scene {
     }
     
     preload() {
-        // Load Tiny Swords assets - paths relative to root
         const basePath = 'assets';
         
-        // Player sprites
         this.load.spritesheet('pawn-blue', `${basePath}/Factions/Knights/Troops/Pawn/Blue/Pawn_Blue.png`, 
             { frameWidth: 192, frameHeight: 192 });
         this.load.spritesheet('warrior-blue', `${basePath}/Factions/Knights/Troops/Warrior/Blue/Warrior_Blue.png`,
             { frameWidth: 192, frameHeight: 192 });
         this.load.spritesheet('warrior-purple', `${basePath}/Factions/Knights/Troops/Warrior/Purple/Warrior_Purple.png`,
             { frameWidth: 192, frameHeight: 192 });
-        
-        // NPCs - goblins
         this.load.spritesheet('goblin', `${basePath}/Factions/Goblins/Troops/Torch/Red/Torch_Red.png`,
             { frameWidth: 192, frameHeight: 192 });
-        
-        // Effects
         this.load.spritesheet('explosion', `${basePath}/Effects/Explosion/Explosions.png`,
             { frameWidth: 32, frameHeight: 32 });
-        
-        // Terrain
         this.load.image('ground', `${basePath}/Terrain/Ground/Tilemap_Flat.png`);
         this.load.image('tree', `${basePath}/Resources/Trees/Tree.png`);
     }
     
     create() {
-        console.log('ðŸŽ® Game Scene Started');
+        console.log('ðŸŽ® Game Scene Started (AGAR.IO STYLE - Client Authoritative)');
         
-        // World setup
         this.WORLD_WIDTH = GameConfig.WORLD_WIDTH;
         this.WORLD_HEIGHT = GameConfig.WORLD_HEIGHT;
         
@@ -39,22 +30,21 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, this.WORLD_WIDTH, this.WORLD_HEIGHT);
         this.cameras.main.setZoom(0.8);
         
-        // Background
         this.add.rectangle(this.WORLD_WIDTH / 2, this.WORLD_HEIGHT / 2, 
             this.WORLD_WIDTH, this.WORLD_HEIGHT, 0x5a7c3e);
         
-        // Create animations
         this.createAnimations();
         
-        // Sprite maps
         this.playerSprites = new Map();
         this.npcSprites = new Map();
         this.nameTexts = new Map();
         this.healthBars = new Map();
         this.shadows = new Map();
         
-        // Local player reference
+        // Local player state (CLIENT CONTROLS THIS)
+        this.myPosition = { x: 0, y: 0, vx: 0, vy: 0, angle: 0 };
         this.localPlayer = null;
+        this.localPlayerSprite = null;
         this.mySessionId = null;
         
         // Input
@@ -67,17 +57,15 @@ class GameScene extends Phaser.Scene {
         };
         this.spaceKey = this.input.keyboard.addKey('SPACE');
         
-        // Connect to server
         this.connectToServer();
         
-        // Send input updates
+        // Send position to server (20 times/sec is enough)
         this.time.addEvent({
-            delay: 16, // ~60 FPS
-            callback: () => this.sendInput(),
+            delay: 50,
+            callback: () => this.sendPosition(),
             loop: true
         });
         
-        // Update leaderboard
         this.time.addEvent({
             delay: 1000,
             callback: () => this.updateLeaderboard(),
@@ -86,24 +74,39 @@ class GameScene extends Phaser.Scene {
     }
     
     async connectToServer() {
+        console.log('ðŸ”Œ Connecting to server...');
+        
         const SERVER_URL = window.location.hostname === 'localhost' 
             ? 'ws://localhost:2567'
-            : 'wss://your-server.railway.app'; // Change this to your Railway URL
+            : 'wss://euneus-production.up.railway.app';
         
         try {
             this.client = new Colyseus.Client(SERVER_URL);
             this.room = await this.client.joinOrCreate("ffa", { username: username });
             
-            console.log('âœ… Connected to server');
+            this.mySessionId = this.room.sessionId;
+            console.log('âœ… Connected! Session:', this.mySessionId);
             
-            // Handle initial connection
             this.room.onMessage("init", (message) => {
-                this.mySessionId = message.sessionId;
-                console.log('ðŸŽ® My session ID:', this.mySessionId);
+                console.log('ðŸ“¨ Init message received');
             });
             
-            // Listen for state changes
+            this.room.onStateChange.once((state) => {
+                console.log('ðŸ“Š Initial state received');
+                
+                state.players.forEach((player, sessionId) => {
+                    this.addPlayer(sessionId, player);
+                });
+                
+                state.npcs.forEach((npc, npcId) => {
+                    this.addNPC(npcId, npc);
+                });
+                
+                console.log('âœ… CLIENT-AUTHORITATIVE MODE ACTIVE');
+            });
+            
             this.room.state.players.onAdd = (player, sessionId) => {
+                if (this.playerSprites.has(sessionId)) return;
                 this.addPlayer(sessionId, player);
             };
             
@@ -112,6 +115,7 @@ class GameScene extends Phaser.Scene {
             };
             
             this.room.state.npcs.onAdd = (npc, npcId) => {
+                if (this.npcSprites.has(npcId)) return;
                 this.addNPC(npcId, npc);
             };
             
@@ -140,22 +144,17 @@ class GameScene extends Phaser.Scene {
                 this.playDeathEffect(data.npcId, true);
             });
             
-            this.room.onMessage("player_levelup", (data) => {
-                // Show level up effect
-            });
-            
             this.room.onMessage("midair_collision", (data) => {
                 this.showCollisionEffect(data.p1, data.p2);
             });
             
         } catch (e) {
-            console.error('âŒ Failed to connect:', e);
-            alert('Failed to connect to server! Make sure server is running.');
+            console.error('âŒ Connection failed:', e);
+            alert('Failed to connect to server!');
         }
     }
     
     createAnimations() {
-        // Pawn animations (peasant)
         if (!this.anims.exists('pawn-idle')) {
             this.anims.create({
                 key: 'pawn-idle',
@@ -171,7 +170,6 @@ class GameScene extends Phaser.Scene {
             });
         }
         
-        // Warrior animations (higher levels)
         if (!this.anims.exists('warrior-idle')) {
             this.anims.create({
                 key: 'warrior-idle',
@@ -193,7 +191,6 @@ class GameScene extends Phaser.Scene {
             });
         }
         
-        // Legend animations (purple warrior)
         if (!this.anims.exists('legend-idle')) {
             this.anims.create({
                 key: 'legend-idle',
@@ -209,7 +206,6 @@ class GameScene extends Phaser.Scene {
             });
         }
         
-        // Goblin (NPC)
         if (!this.anims.exists('goblin-idle')) {
             this.anims.create({
                 key: 'goblin-idle',
@@ -219,7 +215,6 @@ class GameScene extends Phaser.Scene {
             });
         }
         
-        // Explosion
         if (!this.anims.exists('explode')) {
             this.anims.create({
                 key: 'explode',
@@ -233,12 +228,10 @@ class GameScene extends Phaser.Scene {
     addPlayer(sessionId, player) {
         const isLocal = sessionId === this.mySessionId;
         
-        // Shadow
         const shadow = this.add.ellipse(player.x, player.y, 40, 20, 0x000000, 0.3);
         shadow.setDepth(-1);
         this.shadows.set(sessionId, shadow);
         
-        // Sprite
         const spriteKey = this.getSpriteKey(player.level);
         const sprite = this.add.sprite(player.x, player.y, spriteKey);
         sprite.setScale(0.6);
@@ -246,7 +239,6 @@ class GameScene extends Phaser.Scene {
         
         this.playerSprites.set(sessionId, sprite);
         
-        // Name tag
         const nameText = this.add.text(player.x, player.y - 50, player.username, {
             fontSize: '16px',
             color: isLocal ? '#00ff00' : '#ffffff',
@@ -255,25 +247,47 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.nameTexts.set(sessionId, nameText);
         
-        // Health bar
         const healthBar = this.add.graphics();
         this.healthBars.set(sessionId, healthBar);
         
         if (isLocal) {
+            console.log('ðŸ‘¤ This is MY player! I control movement!');
             this.localPlayer = player;
-            this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+            this.localPlayerSprite = sprite;
             
-            // Update HUD
+            // Initialize my position
+            this.myPosition.x = player.x;
+            this.myPosition.y = player.y;
+            
+            this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
             this.updateHUD();
+            
+            // For local player, only listen to server for validation/corrections
+            player.listen("x", (serverX) => {
+                const error = Math.abs(this.myPosition.x - serverX);
+                if (error > 50) {
+                    console.warn(`Server corrected X by ${error.toFixed(0)}px`);
+                    this.myPosition.x = serverX;
+                }
+            });
+            player.listen("y", (serverY) => {
+                const error = Math.abs(this.myPosition.y - serverY);
+                if (error > 50) {
+                    console.warn(`Server corrected Y by ${error.toFixed(0)}px`);
+                    this.myPosition.y = serverY;
+                }
+            });
+            
+            player.listen("hp", () => this.updateHUD());
+            player.listen("level", () => this.updateHUD());
+            player.listen("xp", () => this.updateHUD());
+            player.listen("kills", () => this.updateHUD());
+            
+        } else {
+            // Other players use server position
+            player.listen("x", () => this.updatePlayerSprite(sessionId, player));
+            player.listen("y", () => this.updatePlayerSprite(sessionId, player));
         }
-        
-        // Listen for changes
-        player.onChange = () => {
-            this.updatePlayerSprite(sessionId, player);
-            if (isLocal) {
-                this.updateHUD();
-            }
-        };
     }
     
     removePlayer(sessionId) {
@@ -301,10 +315,8 @@ class GameScene extends Phaser.Scene {
         
         this.npcSprites.set(npcId, sprite);
         
-        npc.onChange = () => {
-            sprite.x = npc.x;
-            sprite.y = npc.y;
-        };
+        npc.listen("x", (value) => { sprite.x = value; });
+        npc.listen("y", (value) => { sprite.y = value; });
     }
     
     removeNPC(npcId) {
@@ -321,50 +333,36 @@ class GameScene extends Phaser.Scene {
         
         if (!sprite) return;
         
-        // Update position with interpolation
         sprite.x = Phaser.Math.Linear(sprite.x, player.x, 0.3);
         sprite.y = Phaser.Math.Linear(sprite.y, player.y - player.z, 0.3);
         
-        // Update scale based on level
         const stage = GameConfig.EVOLUTION_STAGES[Math.min(player.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
         sprite.setScale(stage.scale * 0.6);
         
-        // Update sprite texture if evolved
         const newSpriteKey = this.getSpriteKey(player.level);
         if (sprite.texture.key !== newSpriteKey) {
             sprite.setTexture(newSpriteKey);
             sprite.play(this.getAnimKey(player.level, 'idle'));
         }
         
-        // Update animation
         const isMoving = Math.abs(player.vx) > 10 || Math.abs(player.vy) > 10;
         if (player.isAttacking) {
             if (this.anims.exists(this.getAnimKey(player.level, 'attack'))) {
                 sprite.play(this.getAnimKey(player.level, 'attack'), true);
             }
-            if (!sprite.hasSlashThisAttack && player.attackCooldown > 0) {
-                this.showSlashEffect(sprite.x, sprite.y, player.angle, stage.scale);
-                sprite.hasSlashThisAttack = true;
-            }
+        } else if (isMoving) {
+            sprite.play(this.getAnimKey(player.level, 'walk'), true);
         } else {
-            sprite.hasSlashThisAttack = false;
-            if (isMoving) {
-                sprite.play(this.getAnimKey(player.level, 'walk'), true);
-            } else {
-                sprite.play(this.getAnimKey(player.level, 'idle'), true);
-            }
+            sprite.play(this.getAnimKey(player.level, 'idle'), true);
         }
         
-        // Rotation
         sprite.rotation = player.angle + Math.PI / 2;
         
-        // Name tag
         if (nameText) {
             nameText.x = sprite.x;
             nameText.y = sprite.y - 50 - (stage.scale * 20);
         }
         
-        // Health bar
         if (healthBar && player.hp < player.maxHp) {
             healthBar.clear();
             const barWidth = 40;
@@ -375,9 +373,6 @@ class GameScene extends Phaser.Scene {
             healthBar.fillStyle(0x000000, 0.5);
             healthBar.fillRect(x, y, barWidth, barHeight);
             
-            healthBar.fillStyle(0xff0000);
-            healthBar.fillRect(x, y, barWidth, barHeight);
-            
             const hpPercent = player.hp / player.maxHp;
             healthBar.fillStyle(0x00ff00);
             healthBar.fillRect(x, y, barWidth * hpPercent, barHeight);
@@ -385,7 +380,6 @@ class GameScene extends Phaser.Scene {
             healthBar.clear();
         }
         
-        // Shadow
         if (shadow) {
             shadow.x = player.x;
             shadow.y = player.y;
@@ -407,31 +401,16 @@ class GameScene extends Phaser.Scene {
         return `legend-${action}`;
     }
     
-    sendInput() {
+    sendPosition() {
         if (!this.room || !this.localPlayer) return;
         
-        const moveX = (this.cursors.right.isDown || this.wasd.d.isDown ? 1 : 0) - 
-                      (this.cursors.left.isDown || this.wasd.a.isDown ? 1 : 0);
-        const moveY = (this.cursors.down.isDown || this.wasd.s.isDown ? 1 : 0) - 
-                      (this.cursors.up.isDown || this.wasd.w.isDown ? 1 : 0);
-        
-        const jump = this.spaceKey.isDown;
-        const attack = this.input.activePointer.isDown;
-        
-        const mouseWorldX = this.input.activePointer.worldX;
-        const mouseWorldY = this.input.activePointer.worldY;
-        
-        this.room.send("input", {
-            moveX,
-            moveY,
-            jump,
-            attack,
-            mouseX: mouseWorldX,
-            mouseY: mouseWorldY,
-            attackAngle: Phaser.Math.Angle.Between(
-                this.localPlayer.x, this.localPlayer.y,
-                mouseWorldX, mouseWorldY
-            )
+        // Send my current position to server
+        this.room.send("position", {
+            x: this.myPosition.x,
+            y: this.myPosition.y,
+            vx: this.myPosition.vx,
+            vy: this.myPosition.vy,
+            angle: this.myPosition.angle
         });
     }
     
@@ -483,10 +462,8 @@ class GameScene extends Phaser.Scene {
         const sprite = this.playerSprites.get(targetId);
         if (!sprite) return;
         
-        // Flash red
         this.flashSprite(sprite);
         
-        // Damage text
         const damageText = this.add.text(sprite.x, sprite.y - 60, Math.round(damage), {
             fontSize: isBackstab ? '32px' : '24px',
             color: isBackstab ? '#ff0000' : '#ffaa00',
@@ -523,7 +500,49 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.shake(100, 0.003);
     }
     
-    showCollisionEffect(p1Id, p2Id) {
+
+    showSlashEffect(x, y, angle) {
+        const stage = GameConfig.EVOLUTION_STAGES[Math.min(this.localPlayer.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
+        const range = GameConfig.ATTACK_RANGE * stage.scale * 0.6;
+        const arc = GameConfig.ATTACK_ARC;
+        
+        // Create arc graphics
+        const graphics = this.add.graphics();
+        graphics.lineStyle(8, 0xffffff, 0.8);
+        graphics.fillStyle(0xffff00, 0.3);
+        
+        // Draw the attack arc
+        graphics.beginPath();
+        graphics.moveTo(x, y);
+        graphics.arc(x, y, range, angle - arc / 2, angle + arc / 2, false);
+        graphics.lineTo(x, y);
+        graphics.closePath();
+        graphics.fillPath();
+        graphics.strokePath();
+        
+        // Add slash lines for effect
+        for (let i = 0; i < 3; i++) {
+            const lineAngle = angle - arc / 2 + (arc * i / 2);
+            const endX = x + Math.cos(lineAngle) * range;
+            const endY = y + Math.sin(lineAngle) * range;
+            
+            graphics.lineStyle(4, 0xffffff, 0.6);
+            graphics.beginPath();
+            graphics.moveTo(x, y);
+            graphics.lineTo(endX, endY);
+            graphics.strokePath();
+        }
+        
+        // Fade out the effect
+        this.tweens.add({
+            targets: graphics,
+            alpha: 0,
+            duration: 200,
+            onComplete: () => graphics.destroy()
+        });
+    }
+
+        showCollisionEffect(p1Id, p2Id) {
         const s1 = this.playerSprites.get(p1Id);
         const s2 = this.playerSprites.get(p2Id);
         
@@ -544,42 +563,116 @@ class GameScene extends Phaser.Scene {
         }
     }
     
-    showSlashEffect(x, y, angle, scale) {
-        const slash = this.add.graphics();
-        slash.x = x;
-        slash.y = y;
-        slash.rotation = angle;
-        slash.setDepth(100);
+    update(time, delta) {
+        if (!this.localPlayer || !this.localPlayerSprite) return;
         
-        slash.lineStyle(4 * scale, 0xffffff, 0.9);
-        slash.beginPath();
-        const arcRadius = 60 * scale;
-        const arcAngle = Math.PI / 3;
-        slash.arc(0, 0, arcRadius, -arcAngle / 2, arcAngle / 2, false);
-        slash.strokePath();
+        // delta is in milliseconds, convert to seconds
+        const dt = delta / 1000;
         
-        slash.lineStyle(2 * scale, 0xffdd00, 0.7);
-        slash.beginPath();
-        slash.arc(0, 0, arcRadius - 5, -arcAngle / 2, arcAngle / 2, false);
-        slash.strokePath();
+        // Read input
+        const moveX = (this.cursors.right.isDown || this.wasd.d.isDown ? 1 : 0) - 
+                      (this.cursors.left.isDown || this.wasd.a.isDown ? 1 : 0);
+        const moveY = (this.cursors.down.isDown || this.wasd.s.isDown ? 1 : 0) - 
+                      (this.cursors.up.isDown || this.wasd.w.isDown ? 1 : 0);
         
-        this.tweens.add({
-            targets: slash,
-            alpha: 0,
-            scaleX: 1.4,
-            scaleY: 1.4,
-            duration: 250,
-            ease: 'Power2',
-            onComplete: () => slash.destroy()
-        });
-    }
-    
-    update() {
-        // Smooth camera zoom based on player level
-        if (this.localPlayer) {
-            const targetZoom = Math.max(0.5, 0.8 - (this.localPlayer.level * 0.02));
-            const currentZoom = this.cameras.main.zoom;
-            this.cameras.main.setZoom(Phaser.Math.Linear(currentZoom, targetZoom, 0.02));
+        // CLIENT CONTROLS MOVEMENT COMPLETELY
+        const stage = GameConfig.EVOLUTION_STAGES[Math.min(this.localPlayer.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
+        let speed = stage.speed;
+        
+        // Apply class modifiers
+        if (this.localPlayer.class === "berserker") speed *= GameConfig.CLASSES.berserker.speedBonus;
+        else if (this.localPlayer.class === "paladin") speed *= GameConfig.CLASSES.paladin.speedPenalty;
+        else if (this.localPlayer.class === "assassin") speed *= GameConfig.CLASSES.assassin.speedBonus;
+        
+        // Calculate velocity
+        const inputMag = Math.sqrt(moveX ** 2 + moveY ** 2);
+        if (inputMag > 0) {
+            this.myPosition.vx = (moveX / inputMag) * speed;
+            this.myPosition.vy = (moveY / inputMag) * speed;
+        } else {
+            this.myPosition.vx *= GameConfig.FRICTION;
+            this.myPosition.vy *= GameConfig.FRICTION;
         }
+        
+        // Update position INSTANTLY
+        this.myPosition.x += this.myPosition.vx * dt;
+        this.myPosition.y += this.myPosition.vy * dt;
+        
+        // Clamp to world bounds
+        this.myPosition.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, this.myPosition.x));
+        this.myPosition.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, this.myPosition.y));
+        
+        // Update sprite position IMMEDIATELY
+        this.localPlayerSprite.x = this.myPosition.x;
+        this.localPlayerSprite.y = this.myPosition.y - (this.localPlayer.z || 0);
+        
+        // Update facing angle
+        const mouseWorldX = this.input.activePointer.worldX;
+        const mouseWorldY = this.input.activePointer.worldY;
+        this.myPosition.angle = Math.atan2(
+            mouseWorldY - this.myPosition.y,
+            mouseWorldX - this.myPosition.x
+        );
+        this.localPlayerSprite.rotation = this.myPosition.angle + Math.PI / 2;
+        
+        // Update animation
+        const isMoving = Math.abs(this.myPosition.vx) > 10 || Math.abs(this.myPosition.vy) > 10;
+        if (this.localPlayer.isAttacking) {
+            if (this.anims.exists(this.getAnimKey(this.localPlayer.level, 'attack'))) {
+                this.localPlayerSprite.play(this.getAnimKey(this.localPlayer.level, 'attack'), true);
+            }
+        } else if (isMoving) {
+            this.localPlayerSprite.play(this.getAnimKey(this.localPlayer.level, 'walk'), true);
+        } else {
+            this.localPlayerSprite.play(this.getAnimKey(this.localPlayer.level, 'idle'), true);
+        }
+        
+        // Update UI elements
+        const nameText = this.nameTexts.get(this.mySessionId);
+        const shadow = this.shadows.get(this.mySessionId);
+        const healthBar = this.healthBars.get(this.mySessionId);
+        
+        if (nameText) {
+            nameText.x = this.localPlayerSprite.x;
+            nameText.y = this.localPlayerSprite.y - 50 - (stage.scale * 20);
+        }
+        
+        if (shadow) {
+            shadow.x = this.myPosition.x;
+            shadow.y = this.myPosition.y;
+        }
+        
+        if (healthBar && this.localPlayer.hp < this.localPlayer.maxHp) {
+            healthBar.clear();
+            const barWidth = 40;
+            const barHeight = 5;
+            const x = this.localPlayerSprite.x - barWidth / 2;
+            const y = this.localPlayerSprite.y - 40 - (stage.scale * 20);
+            
+            healthBar.fillStyle(0x000000, 0.5);
+            healthBar.fillRect(x, y, barWidth, barHeight);
+            
+            const hpPercent = this.localPlayer.hp / this.localPlayer.maxHp;
+            healthBar.fillStyle(0x00ff00);
+            healthBar.fillRect(x, y, barWidth * hpPercent, barHeight);
+        } else if (healthBar) {
+            healthBar.clear();
+        }
+        
+        // Handle attacks
+        if (this.input.activePointer.isDown && this.localPlayer.attackCooldown <= 0) {
+            this.room.send("attack", { angle: this.myPosition.angle });
+            this.showSlashEffect(this.myPosition.x, this.myPosition.y, this.myPosition.angle);
+        }
+        
+        // Handle jump
+        if (this.spaceKey.isDown && !this.spaceWasDown) {
+            this.room.send("jump");
+        }
+        this.spaceWasDown = this.spaceKey.isDown;
+        
+        // Smooth camera zoom
+        const targetZoom = Math.max(0.5, 0.8 - (this.localPlayer.level * 0.02));
+        this.cameras.main.setZoom(Phaser.Math.Linear(this.cameras.main.zoom, targetZoom, 0.02));
     }
 }
