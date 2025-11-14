@@ -323,7 +323,12 @@ class GameScene extends Phaser.Scene {
         }
         
         // Listen for changes
+        let changeCount = 0;
         player.onChange = () => {
+            changeCount++;
+            if (isLocal && changeCount % 60 === 0) { // Log every 60 changes to avoid spam
+                console.log(`🔄 Player state changed ${changeCount} times`);
+            }
             this.updatePlayerSprite(sessionId, player);
             if (isLocal) {
                 this.updateHUD();
@@ -375,6 +380,12 @@ class GameScene extends Phaser.Scene {
         const shadow = this.shadows.get(sessionId);
         
         if (!sprite) return;
+        
+        // Debug: Log position updates for local player
+        const isLocal = sessionId === this.mySessionId;
+        if (isLocal && (Math.abs(player.vx) > 0 || Math.abs(player.vy) > 0)) {
+            console.log('📍 Position update:', { x: player.x.toFixed(1), y: player.y.toFixed(1), vx: player.vx.toFixed(1), vy: player.vy.toFixed(1) });
+        }
         
         // Update position with interpolation
         sprite.x = Phaser.Math.Linear(sprite.x, player.x, 0.3);
@@ -468,6 +479,11 @@ class GameScene extends Phaser.Scene {
         
         const mouseWorldX = this.input.activePointer.worldX;
         const mouseWorldY = this.input.activePointer.worldY;
+        
+        // Debug: Log when any input is detected
+        if (moveX !== 0 || moveY !== 0 || jump || attack) {
+            console.log('🎮 INPUT:', { moveX, moveY, jump, attack });
+        }
         
         this.room.send("input", {
             moveX,
