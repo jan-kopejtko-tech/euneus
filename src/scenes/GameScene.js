@@ -521,10 +521,11 @@ class GameScene extends Phaser.Scene {
         }
     }
     
-    update(deltaTime) {
+    update(time, delta) {
         if (!this.localPlayer || !this.localPlayerSprite) return;
         
-        const dt = deltaTime / 1000;
+        // delta is in milliseconds, convert to seconds
+        const dt = delta / 1000;
         
         // Read input
         const moveX = (this.cursors.right.isDown || this.wasd.d.isDown ? 1 : 0) - 
