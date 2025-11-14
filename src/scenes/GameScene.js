@@ -30,8 +30,25 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, this.WORLD_WIDTH, this.WORLD_HEIGHT);
         this.cameras.main.setZoom(0.8);
         
-        this.add.rectangle(this.WORLD_WIDTH / 2, this.WORLD_HEIGHT / 2, 
-            this.WORLD_WIDTH, this.WORLD_HEIGHT, 0x5a7c3e);
+        // Create tiled ground
+        const groundTileSize = 128;
+        for (let x = 0; x < this.WORLD_WIDTH; x += groundTileSize) {
+            for (let y = 0; y < this.WORLD_HEIGHT; y += groundTileSize) {
+                const tile = this.add.image(x, y, 'ground');
+                tile.setOrigin(0, 0);
+                tile.setDepth(-10);
+            }
+        }
+        
+        // Add trees randomly across the map
+        const treeCount = 150;
+        for (let i = 0; i < treeCount; i++) {
+            const x = Math.random() * this.WORLD_WIDTH;
+            const y = Math.random() * this.WORLD_HEIGHT;
+            const tree = this.add.image(x, y, 'tree');
+            tree.setScale(0.8);
+            tree.setDepth(y); // Y-sort for depth
+        }
         
         this.createAnimations();
         
@@ -241,6 +258,7 @@ class GameScene extends Phaser.Scene {
         
         const spriteKey = this.getSpriteKey(player.level);
         const sprite = this.add.sprite(player.x, player.y, spriteKey);
+        sprite.setDepth(player.y);
         sprite.setScale(0.6);
         sprite.play(this.getAnimKey(player.level, 'idle'));
         
@@ -319,6 +337,7 @@ class GameScene extends Phaser.Scene {
         sprite.setScale(0.5);
         sprite.play('goblin-idle');
         sprite.setTint(0xff6666);
+        sprite.setDepth(npc.y);
         
         this.npcSprites.set(npcId, sprite);
         
@@ -342,6 +361,7 @@ class GameScene extends Phaser.Scene {
         
         sprite.x = Phaser.Math.Linear(sprite.x, player.x, 0.3);
         sprite.y = Phaser.Math.Linear(sprite.y, player.y - player.z, 0.3);
+        sprite.setDepth(player.y);
         
         const stage = GameConfig.EVOLUTION_STAGES[Math.min(player.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
         sprite.setScale(stage.scale * 0.6);
@@ -608,6 +628,7 @@ class GameScene extends Phaser.Scene {
         // Update sprite position IMMEDIATELY
         this.localPlayerSprite.x = this.myPosition.x;
         this.localPlayerSprite.y = this.myPosition.y - (this.localPlayer.z || 0);
+        this.localPlayerSprite.setDepth(this.myPosition.y);
         
         // Update facing angle
         const mouseWorldX = this.input.activePointer.worldX;
