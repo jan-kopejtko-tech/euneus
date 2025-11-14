@@ -116,6 +116,34 @@ class FFARoom extends Room {
     this.spawnNPCs(GameConfig.NPC_COUNT);
     
     // Message handlers
+    this.onMessage("position", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+      
+      // Update player position from client
+      player.x = message.x;
+      player.y = message.y;
+      player.vx = message.vx;
+      player.vy = message.vy;
+      player.angle = message.angle;
+    });
+    
+    this.onMessage("attack", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.attackCooldown > 0) return;
+      
+      this.performAttack(client.sessionId, message.angle);
+    });
+    
+    this.onMessage("jump", (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.z > 0 || player.isAirborne) return;
+      
+      player.vz = GameConfig.JUMP_FORCE;
+      player.z = 0.1;
+      player.isAirborne = true;
+    });
+    
     this.onMessage("input", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
