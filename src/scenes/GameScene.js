@@ -56,6 +56,7 @@ class GameScene extends Phaser.Scene {
         // Client-side prediction state
         this.predictedPosition = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 };
         this.lastServerUpdate = Date.now();
+        this.gameStartTime = Date.now();
         
         // Local player reference
         this.localPlayer = null;
@@ -325,9 +326,19 @@ class GameScene extends Phaser.Scene {
             
             // Listen to server updates for reconciliation
             player.listen("x", (serverX) => {
+                // Don't reconcile during first second (initialization)
+                if (Date.now() - this.gameStartTime < 1000) {
+                    this.predictedPosition.x = serverX;
+                    return;
+                }
                 this.reconcilePosition('x', serverX);
             });
             player.listen("y", (serverY) => {
+                // Don't reconcile during first second (initialization)
+                if (Date.now() - this.gameStartTime < 1000) {
+                    this.predictedPosition.y = serverY;
+                    return;
+                }
                 this.reconcilePosition('y', serverY);
             });
             player.listen("z", (serverZ) => {
@@ -349,25 +360,21 @@ class GameScene extends Phaser.Scene {
     }
     
     reconcilePosition(axis, serverValue) {
-        // Smooth reconciliation between predicted and server position
         const predicted = this.predictedPosition[axis];
         const error = Math.abs(predicted - serverValue);
         
-        // If error is small, just snap to server
-        if (error < 5) {
-            this.predictedPosition[axis] = serverValue;
+        // Ignore tiny errors
+        if (error < 10) {
+            return;
         }
-        // If error is large, something went wrong - hard snap
-        else if (error > 100) {
-            console.warn(`⚠️ Large prediction error on ${axis}: ${error.toFixed(1)}px, snapping to server`);
-            this.predictedPosition[axis] = serverValue;
+        // Small error - gentle correction
+        else if (error < 100) {
+            this.predictedPosition[axis] = Phaser.Math.Linear(predicted, serverValue, 0.3);
         }
-        // Medium error - smoothly correct over time
+        // Large error - snap (respawn/teleport)
         else {
-            this.predictedPosition[axis] = Phaser.Math.Linear(predicted, serverValue, 0.2);
+            this.predictedPosition[axis] = serverValue;
         }
-        
-        this.lastServerUpdate = Date.now();
     }
     
     removePlayer(sessionId) {
@@ -623,6 +630,7 @@ class GameScene extends Phaser.Scene {
     update(deltaTime) {
         if (!this.localPlayer || !this.localPlayerSprite) return;
         
+        // Convert deltaTime from milliseconds to seconds (Phaser gives ms, we need seconds)
         const dt = deltaTime / 1000;
         
         // Read input state
@@ -635,7 +643,7 @@ class GameScene extends Phaser.Scene {
         this.currentInput.mouseX = this.input.activePointer.worldX;
         this.currentInput.mouseY = this.input.activePointer.worldY;
         
-        // CLIENT-SIDE PREDICTION: Move immediately based on input
+        // CLIENT-SIDE PREDICTION: Replicate server physics EXACTLY
         const stage = GameConfig.EVOLUTION_STAGES[Math.min(this.localPlayer.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
         let speed = stage.speed;
         
@@ -648,22 +656,25 @@ class GameScene extends Phaser.Scene {
             speed *= GameConfig.CLASSES.assassin.speedBonus;
         }
         
-        // Calculate velocity from input
+        // Apply movement input - EXACT SAME as server
         const inputMag = Math.sqrt(this.currentInput.moveX ** 2 + this.currentInput.moveY ** 2);
         if (inputMag > 0) {
+            // Set velocity directly (server does this)
             this.predictedPosition.vx = (this.currentInput.moveX / inputMag) * speed;
             this.predictedPosition.vy = (this.currentInput.moveY / inputMag) * speed;
         } else {
-            // Apply friction when no input
-            this.predictedPosition.vx *= GameConfig.FRICTION;
-            this.predictedPosition.vy *= GameConfig.FRICTION;
+            // No input - velocity should stay from friction below
         }
         
-        // Update predicted position
+        // Update position (server: player.x += player.vx * dt)
         this.predictedPosition.x += this.predictedPosition.vx * dt;
         this.predictedPosition.y += this.predictedPosition.vy * dt;
         
-        // Clamp to world bounds
+        // Apply friction (server does this AFTER position update)
+        this.predictedPosition.vx *= GameConfig.FRICTION;
+        this.predictedPosition.vy *= GameConfig.FRICTION;
+        
+        // Clamp to world bounds (same as server)
         this.predictedPosition.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, this.predictedPosition.x));
         this.predictedPosition.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, this.predictedPosition.y));
         
