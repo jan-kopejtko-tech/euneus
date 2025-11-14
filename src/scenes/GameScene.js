@@ -266,7 +266,7 @@ class GameScene extends Phaser.Scene {
             this.myPosition.x = player.x;
             this.myPosition.y = player.y;
             
-            this.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+            this.cameras.main.startFollow(sprite, true, 0.2, 0.2);
             this.updateHUD();
             
             // For local player, only listen to server for validation/corrections
