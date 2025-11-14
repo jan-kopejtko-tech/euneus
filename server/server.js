@@ -13,6 +13,8 @@ app.use(cors({
     'http://localhost:8000',
     'http://localhost:3000',
     'http://localhost:5173',
+    'https://www.euneus.com',
+    'https://euneus.com',
     'https://euneus-9c6xjo3vz-jans-projects-e4f89011.vercel.app',
     process.env.CLIENT_URL // For future domain changes
   ],

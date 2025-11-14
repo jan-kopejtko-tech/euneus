@@ -88,7 +88,7 @@ class GameScene extends Phaser.Scene {
     async connectToServer() {
         const SERVER_URL = window.location.hostname === 'localhost' 
             ? 'ws://localhost:2567'
-            : 'wss://your-server.railway.app'; // Change this to your Railway URL
+            : 'wss://euneus-production.up.railway.app'; // Change this to your Railway URL
         
         try {
             this.client = new window.Colyseus.Client(SERVER_URL);

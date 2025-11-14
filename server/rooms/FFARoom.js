@@ -1,6 +1,6 @@
 const { Room } = require("@colyseus/core");
 const { Schema, MapSchema, type } = require("@colyseus/schema");
-const GameConfig = require("../../shared/GameConfig");
+const GameConfig = require("../GameConfig");
 
 // Player state schema
 class Player extends Schema {
@@ -104,7 +104,7 @@ type("number")(GameState.prototype, "tick");
 class FFARoom extends Room {
   
   onCreate(options) {
-    console.log("🎮 FFA Room Created!");
+    console.log("ðŸŽ® FFA Room Created!");
     
     this.setState(new GameState());
     this.maxClients = 200;
@@ -161,7 +161,7 @@ class FFARoom extends Room {
   }
   
   onJoin(client, options) {
-    console.log(`✅ ${options.username || "Player"} joined`);
+    console.log(`âœ… ${options.username || "Player"} joined`);
     
     // Random spawn position
     const player = new Player(
@@ -181,12 +181,12 @@ class FFARoom extends Room {
   }
   
   onLeave(client, consented) {
-    console.log(`❌ Player ${client.sessionId} left`);
+    console.log(`âŒ Player ${client.sessionId} left`);
     this.state.players.delete(client.sessionId);
   }
   
   onDispose() {
-    console.log("🛑 FFA Room Disposed");
+    console.log("ðŸ›‘ FFA Room Disposed");
     this.npcSpawnTimer.clear();
   }
   
