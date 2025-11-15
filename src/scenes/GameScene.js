@@ -114,6 +114,26 @@ class GameScene extends Phaser.Scene {
                 console.log('📨 Init received');
             });
             
+            // Set up state listeners immediately
+            this.room.state.players.onAdd = (player, sessionId) => {
+                if (this.playerSprites.has(sessionId)) return;
+                this.addPlayer(sessionId, player);
+            };
+            
+            this.room.state.players.onRemove = (player, sessionId) => {
+                this.removePlayer(sessionId);
+            };
+            
+            this.room.state.npcs.onAdd = (npc, npcId) => {
+                if (this.npcSprites.has(npcId)) return;
+                this.addNPC(npcId, npc);
+            };
+            
+            this.room.state.npcs.onRemove = (npc, npcId) => {
+                console.log(`📡 Server removed NPC: ${npcId}`);
+                this.removeNPC(npcId);
+            };
+            
             // SERVER STATE UPDATES (FOR RECONCILIATION)
             this.room.onMessage("state_update", (message) => {
                 this.reconcileServerState(message);
@@ -132,24 +152,6 @@ class GameScene extends Phaser.Scene {
                 
                 console.log('✅ CLIENT PREDICTION ACTIVE');
             });
-            
-            this.room.state.players.onAdd = (player, sessionId) => {
-                if (this.playerSprites.has(sessionId)) return;
-                this.addPlayer(sessionId, player);
-            };
-            
-            this.room.state.players.onRemove = (player, sessionId) => {
-                this.removePlayer(sessionId);
-            };
-            
-            this.room.state.npcs.onAdd = (npc, npcId) => {
-                if (this.npcSprites.has(npcId)) return;
-                this.addNPC(npcId, npc);
-            };
-            
-            this.room.state.npcs.onRemove = (npc, npcId) => {
-                this.removeNPC(npcId);
-            };
             
             this.room.onMessage("player_hit", (data) => {
                 this.showHitEffect(data.target, data.damage, data.isBackstab);
