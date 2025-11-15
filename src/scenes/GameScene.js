@@ -146,7 +146,7 @@ class GameScene extends Phaser.Scene {
             
             this.room.state.npcs.onRemove = (npc, npcId) => {
                 this.removeNPC(npcId);
-            });
+            };
             
             this.room.onMessage("player_hit", (data) => {
                 this.showHitEffect(data.target, data.damage, data.isBackstab);
