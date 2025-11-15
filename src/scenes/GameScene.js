@@ -18,6 +18,8 @@ class GameScene extends Phaser.Scene {
             { frameWidth: 32, frameHeight: 32 });
         this.load.image('ground', `${basePath}/Terrain/Ground/Tilemap_Flat.png`);
         this.load.image('tree', `${basePath}/Resources/Trees/Tree.png`);
+        this.load.image('barrel', `${basePath}/Factions/Goblins/Troops/Barrel/Red/Barrel_Red.png`);
+        this.load.image('crate', `${basePath}/Deco/01.png`);
     }
     
     create() {
@@ -858,11 +860,10 @@ class GameScene extends Phaser.Scene {
     }
     
     addDestructible(destructibleId, destructible) {
-        // Create sprite based on type
+        // Create sprite based on type using actual assets
         const spriteKey = destructible.type === "barrel" ? 'barrel' : 'crate';
-        const sprite = this.add.rectangle(destructible.x, destructible.y, 40, 40, 
-            destructible.type === "barrel" ? 0x8B4513 : 0xA0522D);
-        sprite.setStrokeStyle(2, 0x000000);
+        const sprite = this.add.image(destructible.x, destructible.y, spriteKey);
+        sprite.setScale(0.3);
         sprite.setDepth(destructible.y - 1);
         
         this.destructibleSprites.set(destructibleId, sprite);
