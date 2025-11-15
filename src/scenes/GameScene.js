@@ -600,9 +600,30 @@ class GameScene extends Phaser.Scene {
     }
     
     flashSprite(sprite) {
-        sprite.setTint(0xffffff);  // White flash
+        const originalScale = sprite.scaleX;
+        
+        // Pulse effect
+        this.tweens.add({
+            targets: sprite,
+            scaleX: originalScale * 1.3,
+            scaleY: originalScale * 1.3,
+            duration: 50,
+            yoyo: true,
+            onComplete: () => {
+                sprite.setScale(originalScale);
+            }
+        });
+        
+        // Also try tint
+        sprite.setTint(0xffffff);
         this.time.delayedCall(100, () => {
-            if (sprite && sprite.active) sprite.setTint(0xff6666);  // Back to red
+            if (sprite && sprite.active) {
+                if (sprite.texture.key === 'goblin') {
+                    sprite.setTint(0xff6666);
+                } else {
+                    sprite.clearTint();
+                }
+            }
         });
     }
     
