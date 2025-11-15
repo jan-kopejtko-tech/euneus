@@ -79,6 +79,9 @@ class GameScene extends Phaser.Scene {
         };
         this.spaceKey = this.input.keyboard.addKey('SPACE');
         
+        this.wantsToAttack = false;
+        this.lastAttackTime = 0;
+        
         this.connectToServer();
         
         this.time.addEvent({
@@ -241,7 +244,9 @@ class GameScene extends Phaser.Scene {
         const jump = this.spaceKey.isDown && !this.spaceWasDown && this.clientState.z === 0 && !this.clientState.isAirborne;
         this.spaceWasDown = this.spaceKey.isDown;
         
-        const attack = this.input.activePointer.isDown && this.localPlayer.attackCooldown <= 0;
+        // Use the flag set in update()
+        const attack = this.wantsToAttack;
+        this.wantsToAttack = false; // Reset after sending
         
         const input = {
             seq: this.inputSequence++,
@@ -252,11 +257,12 @@ class GameScene extends Phaser.Scene {
             attack: attack
         };
         
+        if (attack) {
+            console.log('🗡️ Sending attack to server');
+        }
+        
         // Send to server
         this.room.send("input", input);
-        
-        // Store current input (don't apply here - apply in update())
-        this.currentInput = input;
         
         // Handle jump locally
         if (jump) {
@@ -757,7 +763,9 @@ class GameScene extends Phaser.Scene {
             healthBar.clear();
         }
         
-        if (this.input.activePointer.isDown && this.localPlayer.attackCooldown <= 0) {
+        if (this.input.activePointer.isDown && Date.now() - this.lastAttackTime > 400) {
+            this.wantsToAttack = true;
+            this.lastAttackTime = Date.now();
             this.showSlashEffect(this.clientState.x, this.clientState.y, this.clientState.angle);
         }
         
