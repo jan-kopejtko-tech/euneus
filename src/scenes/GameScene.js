@@ -600,9 +600,9 @@ class GameScene extends Phaser.Scene {
     }
     
     flashSprite(sprite) {
-        sprite.setTint(0xff0000);
-        this.time.delayedCall(80, () => {
-            if (sprite && sprite.active) sprite.clearTint();
+        sprite.setTint(0xffffff);  // White flash
+        this.time.delayedCall(100, () => {
+            if (sprite && sprite.active) sprite.setTint(0xff6666);  // Back to red
         });
     }
     
