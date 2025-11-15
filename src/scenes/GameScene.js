@@ -181,31 +181,12 @@ class GameScene extends Phaser.Scene {
     reconcileServerState(serverState) {
         if (!this.localPlayer) return;
         
-        const errorThreshold = 5;
-        const dx = Math.abs(this.clientState.x - serverState.x);
-        const dy = Math.abs(this.clientState.y - serverState.y);
-        
-        if (dx > errorThreshold || dy > errorThreshold) {
-            console.log(`🔄 Server correction: dx=${dx.toFixed(1)}, dy=${dy.toFixed(1)}`);
-            
-            // Set to server position
-            this.clientState.x = serverState.x;
-            this.clientState.y = serverState.y;
-            this.clientState.z = serverState.z;
-            this.clientState.vx = serverState.vx;
-            this.clientState.vy = serverState.vy;
-            this.clientState.vz = serverState.vz;
-            this.clientState.isAirborne = serverState.isAirborne;
-            
-            // Re-apply pending inputs
-            const j = this.pendingInputs.findIndex(input => input.seq === serverState.lastProcessedInput);
-            if (j >= 0) {
-                this.pendingInputs = this.pendingInputs.slice(j + 1);
-                for (let input of this.pendingInputs) {
-                    this.applyInput(input, 0.05);
-                }
-            }
-        }
+        // Smooth correction toward server position
+        const lerpFactor = 0.15;
+        this.clientState.x = Phaser.Math.Linear(this.clientState.x, serverState.x, lerpFactor);
+        this.clientState.y = Phaser.Math.Linear(this.clientState.y, serverState.y, lerpFactor);
+        this.clientState.z = serverState.z;
+        this.clientState.isAirborne = serverState.isAirborne;
     }
     
     applyInput(input, dt) {
@@ -274,16 +255,8 @@ class GameScene extends Phaser.Scene {
         // Send to server
         this.room.send("input", input);
         
-        // Store for reconciliation
-        this.pendingInputs.push(input);
-        
-        // Predict locally
-        this.applyInput(input, 0.05);
-        
-        // Limit pending inputs
-        if (this.pendingInputs.length > 100) {
-            this.pendingInputs.shift();
-        }
+        // Store current input (don't apply here - apply in update())
+        this.currentInput = input;
         
         // Handle jump locally
         if (jump) {
@@ -683,13 +656,60 @@ class GameScene extends Phaser.Scene {
     update(time, delta) {
         if (!this.localPlayer || !this.localPlayerSprite) return;
         
+        const dt = delta / 1000;
+        
+        // Get current input
+        const moveX = (this.cursors.right.isDown || this.wasd.d.isDown ? 1 : 0) - 
+                      (this.cursors.left.isDown || this.wasd.a.isDown ? 1 : 0);
+        const moveY = (this.cursors.down.isDown || this.wasd.s.isDown ? 1 : 0) - 
+                      (this.cursors.up.isDown || this.wasd.w.isDown ? 1 : 0);
+        
+        const mouseWorldX = this.input.activePointer.worldX;
+        const mouseWorldY = this.input.activePointer.worldY;
+        this.clientState.angle = Math.atan2(mouseWorldY - this.clientState.y, mouseWorldX - this.clientState.x);
+        
+        // Apply movement every frame
+        const stage = this.getEvolutionStage(this.localPlayer.level);
+        let speed = stage.speed;
+        
+        if (this.localPlayer.class === "berserker") speed *= GameConfig.CLASSES.berserker.speedBonus;
+        else if (this.localPlayer.class === "paladin") speed *= GameConfig.CLASSES.paladin.speedPenalty;
+        else if (this.localPlayer.class === "assassin") speed *= GameConfig.CLASSES.assassin.speedBonus;
+        
+        const inputMag = Math.sqrt(moveX ** 2 + moveY ** 2);
+        if (inputMag > 0) {
+            this.clientState.vx = (moveX / inputMag) * speed;
+            this.clientState.vy = (moveY / inputMag) * speed;
+        } else {
+            this.clientState.vx *= GameConfig.FRICTION;
+            this.clientState.vy *= GameConfig.FRICTION;
+        }
+        
+        this.clientState.x += this.clientState.vx * dt;
+        this.clientState.y += this.clientState.vy * dt;
+        
+        // Gravity
+        if (this.clientState.z > 0 || this.clientState.vz > 0) {
+            this.clientState.vz -= GameConfig.GRAVITY * dt;
+            this.clientState.z += this.clientState.vz * dt;
+            
+            if (this.clientState.z <= 0) {
+                this.clientState.z = 0;
+                this.clientState.vz = 0;
+                this.clientState.isAirborne = false;
+            }
+        }
+        
+        // World bounds
+        this.clientState.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, this.clientState.x));
+        this.clientState.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, this.clientState.y));
+        
         // Render client prediction
         this.localPlayerSprite.x = this.clientState.x;
         this.localPlayerSprite.y = this.clientState.y - this.clientState.z;
         this.localPlayerSprite.setDepth(this.clientState.y);
         this.localPlayerSprite.rotation = this.clientState.angle + Math.PI / 2;
         
-        const stage = this.getEvolutionStage(this.localPlayer.level);
         this.localPlayerSprite.setScale(stage.scale * 0.6);
         
         const isMoving = Math.abs(this.clientState.vx) > 10 || Math.abs(this.clientState.vy) > 10;
