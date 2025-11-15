@@ -102,6 +102,10 @@ class FFARoom extends Room {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.hp <= 0) return;
       
+      if (input.attack) {
+        console.log(`📥 Attack input received from ${player.username}`);
+      }
+      
       this.processInput(player, input);
       player.lastProcessedInput = input.seq;
       
@@ -190,7 +194,10 @@ class FFARoom extends Room {
     }
     
     if (input.attack && player.attackCooldown <= 0 && !player.isAttacking) {
+      console.log(`🎯 Processing attack: cooldown=${player.attackCooldown}, isAttacking=${player.isAttacking}`);
       this.performAttack(player, input.angle);
+    } else if (input.attack) {
+      console.log(`❌ Attack blocked: cooldown=${player.attackCooldown}, isAttacking=${player.isAttacking}`);
     }
   }
   
