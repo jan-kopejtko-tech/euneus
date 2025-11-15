@@ -434,7 +434,9 @@ class FFARoom extends Room {
       
       if (angleDiff <= arc / 2) {
         npcsHit++;
+        const oldHp = npc.hp;
         npc.hp -= damage;
+        console.log(`  🎯 HIT NPC ${npcId}: HP ${oldHp} -> ${npc.hp} (damage: ${damage})`);
         
         npc.vx += Math.cos(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
         npc.vy += Math.sin(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
@@ -442,10 +444,12 @@ class FFARoom extends Room {
         this.broadcast("npc_hit", { npcId, damage });
         
         if (npc.hp <= 0) {
-          console.log(`  💀 NPC killed`);
+          console.log(`  💀 NPC ${npcId} KILLED - deleting from state`);
           this.state.npcs.delete(npcId);
           this.giveXP(attacker, GameConfig.NPC_XP_REWARD);
           this.broadcast("npc_killed", { npcId, killerId: attackerId });
+        } else {
+          console.log(`  ❤️ NPC ${npcId} survived with ${npc.hp} HP`);
         }
       }
     }
