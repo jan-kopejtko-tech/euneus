@@ -428,8 +428,14 @@ class GameScene extends Phaser.Scene {
     }
     
     removeNPC(npcId) {
+        console.log(`🗑️ Removing NPC: ${npcId}`);
         const sprite = this.npcSprites.get(npcId);
-        if (sprite) sprite.destroy();
+        if (sprite) {
+            console.log(`  Destroying sprite at (${sprite.x.toFixed(0)}, ${sprite.y.toFixed(0)})`);
+            sprite.destroy();
+        } else {
+            console.log(`  No sprite found for ${npcId}`);
+        }
         this.npcSprites.delete(npcId);
     }
     
@@ -590,9 +596,14 @@ class GameScene extends Phaser.Scene {
     }
     
     playDeathEffect(entityId, isNPC = false) {
+        console.log(`💥 Death effect for ${isNPC ? 'NPC' : 'player'}: ${entityId}`);
         const sprite = isNPC ? this.npcSprites.get(entityId) : this.playerSprites.get(entityId);
-        if (!sprite) return;
+        if (!sprite) {
+            console.log(`  No sprite found!`);
+            return;
+        }
         
+        console.log(`  Sprite at (${sprite.x.toFixed(0)}, ${sprite.y.toFixed(0)})`);
         const explosion = this.add.sprite(sprite.x, sprite.y, 'explosion');
         explosion.setScale(2);
         explosion.play('explode');
