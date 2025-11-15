@@ -21,7 +21,7 @@ class GameScene extends Phaser.Scene {
     }
     
     create() {
-        console.log('ðŸŽ® Game Scene Started (AGAR.IO STYLE - Client Authoritative)');
+        console.log('🎮 AGAR.IO PREDICTION + RECONCILIATION MODE');
         
         this.WORLD_WIDTH = GameConfig.WORLD_WIDTH;
         this.WORLD_HEIGHT = GameConfig.WORLD_HEIGHT;
@@ -30,7 +30,6 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, this.WORLD_WIDTH, this.WORLD_HEIGHT);
         this.cameras.main.setZoom(0.8);
         
-        // Create tiled ground
         const groundTileSize = 128;
         for (let x = 0; x < this.WORLD_WIDTH; x += groundTileSize) {
             for (let y = 0; y < this.WORLD_HEIGHT; y += groundTileSize) {
@@ -40,14 +39,13 @@ class GameScene extends Phaser.Scene {
             }
         }
         
-        // Add trees randomly across the map
         const treeCount = 150;
         for (let i = 0; i < treeCount; i++) {
             const x = Math.random() * this.WORLD_WIDTH;
             const y = Math.random() * this.WORLD_HEIGHT;
             const tree = this.add.image(x, y, 'tree');
             tree.setScale(0.8);
-            tree.setDepth(y); // Y-sort for depth
+            tree.setDepth(y);
         }
         
         this.createAnimations();
@@ -58,13 +56,20 @@ class GameScene extends Phaser.Scene {
         this.healthBars = new Map();
         this.shadows = new Map();
         
-        // Local player state (CLIENT CONTROLS THIS)
-        this.myPosition = { x: 0, y: 0, vx: 0, vy: 0, angle: 0 };
+        // CLIENT PREDICTION SYSTEM
+        this.inputSequence = 0;
+        this.pendingInputs = [];
+        this.clientState = {
+            x: 0, y: 0, z: 0,
+            vx: 0, vy: 0, vz: 0,
+            angle: 0,
+            isAirborne: false
+        };
+        
         this.localPlayer = null;
         this.localPlayerSprite = null;
         this.mySessionId = null;
         
-        // Input
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = {
             w: this.input.keyboard.addKey('W'),
@@ -76,10 +81,9 @@ class GameScene extends Phaser.Scene {
         
         this.connectToServer();
         
-        // Send position to server (20 times/sec is enough)
         this.time.addEvent({
             delay: 50,
-            callback: () => this.sendPosition(),
+            callback: () => this.sendInput(),
             loop: true
         });
         
@@ -91,32 +95,29 @@ class GameScene extends Phaser.Scene {
     }
     
     async connectToServer() {
-        console.log('ðŸ”Œ Connecting to server...');
+        console.log('🔌 Connecting...');
         
         const SERVER_URL = window.location.hostname === 'localhost' 
             ? 'ws://localhost:2567'
             : 'wss://euneus-production.up.railway.app';
         
-        console.log('🎯 Target server:', SERVER_URL);
-        console.log('👤 Username:', username);
-        
         try {
-            console.log('⏳ Creating Colyseus client...');
             this.client = new Colyseus.Client(SERVER_URL);
-            console.log('✅ Client created');
-            
-            console.log('⏳ Joining/creating room "ffa"...');
             this.room = await this.client.joinOrCreate("ffa", { username: username });
-            
             this.mySessionId = this.room.sessionId;
-            console.log('âœ… Connected! Session:', this.mySessionId);
+            console.log('✅ Connected:', this.mySessionId);
             
             this.room.onMessage("init", (message) => {
-                console.log('ðŸ“¨ Init message received');
+                console.log('📨 Init received');
+            });
+            
+            // SERVER STATE UPDATES (FOR RECONCILIATION)
+            this.room.onMessage("state_update", (message) => {
+                this.reconcileServerState(message);
             });
             
             this.room.onStateChange.once((state) => {
-                console.log('ðŸ“Š Initial state received');
+                console.log('📦 Initial state');
                 
                 state.players.forEach((player, sessionId) => {
                     this.addPlayer(sessionId, player);
@@ -126,7 +127,7 @@ class GameScene extends Phaser.Scene {
                     this.addNPC(npcId, npc);
                 });
                 
-                console.log('âœ… CLIENT-AUTHORITATIVE MODE ACTIVE');
+                console.log('✅ CLIENT PREDICTION ACTIVE');
             });
             
             this.room.state.players.onAdd = (player, sessionId) => {
@@ -145,9 +146,8 @@ class GameScene extends Phaser.Scene {
             
             this.room.state.npcs.onRemove = (npc, npcId) => {
                 this.removeNPC(npcId);
-            };
+            });
             
-            // Combat events
             this.room.onMessage("player_hit", (data) => {
                 this.showHitEffect(data.target, data.damage, data.isBackstab);
             });
@@ -173,8 +173,123 @@ class GameScene extends Phaser.Scene {
             });
             
         } catch (e) {
-            console.error('âŒ Connection failed:', e);
+            console.error('❌ Connection failed:', e);
             alert('Failed to connect to server!');
+        }
+    }
+    
+    reconcileServerState(serverState) {
+        if (!this.localPlayer) return;
+        
+        const errorThreshold = 5;
+        const dx = Math.abs(this.clientState.x - serverState.x);
+        const dy = Math.abs(this.clientState.y - serverState.y);
+        
+        if (dx > errorThreshold || dy > errorThreshold) {
+            console.log(`🔄 Server correction: dx=${dx.toFixed(1)}, dy=${dy.toFixed(1)}`);
+            
+            // Set to server position
+            this.clientState.x = serverState.x;
+            this.clientState.y = serverState.y;
+            this.clientState.z = serverState.z;
+            this.clientState.vx = serverState.vx;
+            this.clientState.vy = serverState.vy;
+            this.clientState.vz = serverState.vz;
+            this.clientState.isAirborne = serverState.isAirborne;
+            
+            // Re-apply pending inputs
+            const j = this.pendingInputs.findIndex(input => input.seq === serverState.lastProcessedInput);
+            if (j >= 0) {
+                this.pendingInputs = this.pendingInputs.slice(j + 1);
+                for (let input of this.pendingInputs) {
+                    this.applyInput(input, 0.05);
+                }
+            }
+        }
+    }
+    
+    applyInput(input, dt) {
+        const stage = this.getEvolutionStage(this.localPlayer.level);
+        let speed = stage.speed;
+        
+        if (this.localPlayer.class === "berserker") speed *= GameConfig.CLASSES.berserker.speedBonus;
+        else if (this.localPlayer.class === "paladin") speed *= GameConfig.CLASSES.paladin.speedPenalty;
+        else if (this.localPlayer.class === "assassin") speed *= GameConfig.CLASSES.assassin.speedBonus;
+        
+        const inputMag = Math.sqrt(input.moveX ** 2 + input.moveY ** 2);
+        if (inputMag > 0) {
+            this.clientState.vx = (input.moveX / inputMag) * speed;
+            this.clientState.vy = (input.moveY / inputMag) * speed;
+        } else {
+            this.clientState.vx *= GameConfig.FRICTION;
+            this.clientState.vy *= GameConfig.FRICTION;
+        }
+        
+        this.clientState.x += this.clientState.vx * dt;
+        this.clientState.y += this.clientState.vy * dt;
+        
+        if (this.clientState.z > 0 || this.clientState.vz > 0) {
+            this.clientState.vz -= GameConfig.GRAVITY * dt;
+            this.clientState.z += this.clientState.vz * dt;
+            
+            if (this.clientState.z <= 0) {
+                this.clientState.z = 0;
+                this.clientState.vz = 0;
+                this.clientState.isAirborne = false;
+            }
+        }
+        
+        this.clientState.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, this.clientState.x));
+        this.clientState.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, this.clientState.y));
+        
+        this.clientState.angle = input.angle;
+    }
+    
+    sendInput() {
+        if (!this.room || !this.localPlayer) return;
+        
+        const moveX = (this.cursors.right.isDown || this.wasd.d.isDown ? 1 : 0) - 
+                      (this.cursors.left.isDown || this.wasd.a.isDown ? 1 : 0);
+        const moveY = (this.cursors.down.isDown || this.wasd.s.isDown ? 1 : 0) - 
+                      (this.cursors.up.isDown || this.wasd.w.isDown ? 1 : 0);
+        
+        const mouseWorldX = this.input.activePointer.worldX;
+        const mouseWorldY = this.input.activePointer.worldY;
+        const angle = Math.atan2(mouseWorldY - this.clientState.y, mouseWorldX - this.clientState.x);
+        
+        const jump = this.spaceKey.isDown && !this.spaceWasDown && this.clientState.z === 0 && !this.clientState.isAirborne;
+        this.spaceWasDown = this.spaceKey.isDown;
+        
+        const attack = this.input.activePointer.isDown && this.localPlayer.attackCooldown <= 0;
+        
+        const input = {
+            seq: this.inputSequence++,
+            moveX: moveX,
+            moveY: moveY,
+            angle: angle,
+            jump: jump,
+            attack: attack
+        };
+        
+        // Send to server
+        this.room.send("input", input);
+        
+        // Store for reconciliation
+        this.pendingInputs.push(input);
+        
+        // Predict locally
+        this.applyInput(input, 0.05);
+        
+        // Limit pending inputs
+        if (this.pendingInputs.length > 100) {
+            this.pendingInputs.shift();
+        }
+        
+        // Handle jump locally
+        if (jump) {
+            this.clientState.vz = GameConfig.JUMP_FORCE;
+            this.clientState.z = 0.1;
+            this.clientState.isAirborne = true;
         }
     }
     
@@ -276,32 +391,21 @@ class GameScene extends Phaser.Scene {
         this.healthBars.set(sessionId, healthBar);
         
         if (isLocal) {
-            console.log('ðŸ‘¤ This is MY player! I control movement!');
+            console.log('👤 This is MY player!');
             this.localPlayer = player;
             this.localPlayerSprite = sprite;
             
-            // Initialize my position
-            this.myPosition.x = player.x;
-            this.myPosition.y = player.y;
+            this.clientState.x = player.x;
+            this.clientState.y = player.y;
+            this.clientState.z = player.z;
+            this.clientState.vx = player.vx;
+            this.clientState.vy = player.vy;
+            this.clientState.vz = player.vz;
+            this.clientState.angle = player.angle;
+            this.clientState.isAirborne = player.isAirborne;
             
             this.cameras.main.startFollow(sprite, true, 0.2, 0.2);
             this.updateHUD();
-            
-            // For local player, only listen to server for validation/corrections
-            player.listen("x", (serverX) => {
-                const error = Math.abs(this.myPosition.x - serverX);
-                if (error > 50) {
-                    console.warn(`Server corrected X by ${error.toFixed(0)}px`);
-                    this.myPosition.x = serverX;
-                }
-            });
-            player.listen("y", (serverY) => {
-                const error = Math.abs(this.myPosition.y - serverY);
-                if (error > 50) {
-                    console.warn(`Server corrected Y by ${error.toFixed(0)}px`);
-                    this.myPosition.y = serverY;
-                }
-            });
             
             player.listen("hp", () => this.updateHUD());
             player.listen("level", () => this.updateHUD());
@@ -309,7 +413,6 @@ class GameScene extends Phaser.Scene {
             player.listen("kills", () => this.updateHUD());
             
         } else {
-            // Other players use server position
             player.listen("x", () => this.updatePlayerSprite(sessionId, player));
             player.listen("y", () => this.updatePlayerSprite(sessionId, player));
         }
@@ -428,17 +531,9 @@ class GameScene extends Phaser.Scene {
         return `legend-${action}`;
     }
     
-    sendPosition() {
-        if (!this.room || !this.localPlayer) return;
-        
-        // Send my current position to server
-        this.room.send("position", {
-            x: this.myPosition.x,
-            y: this.myPosition.y,
-            vx: this.myPosition.vx,
-            vy: this.myPosition.vy,
-            angle: this.myPosition.angle
-        });
+    getEvolutionStage(level) {
+        const clampedLevel = Math.max(1, Math.min(level, GameConfig.EVOLUTION_STAGES.length));
+        return GameConfig.EVOLUTION_STAGES[clampedLevel - 1];
     }
     
     updateHUD() {
@@ -527,9 +622,8 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.shake(100, 0.003);
     }
     
-
     showSlashEffect(x, y, angle) {
-        const stage = GameConfig.EVOLUTION_STAGES[Math.min(this.localPlayer.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
+        const stage = this.getEvolutionStage(this.localPlayer.level);
         const range = GameConfig.ATTACK_RANGE * stage.scale * 0.6;
         const arc = GameConfig.ATTACK_ARC;
         
@@ -565,7 +659,7 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-        showCollisionEffect(p1Id, p2Id) {
+    showCollisionEffect(p1Id, p2Id) {
         const s1 = this.playerSprites.get(p1Id);
         const s2 = this.playerSprites.get(p2Id);
         
@@ -589,58 +683,16 @@ class GameScene extends Phaser.Scene {
     update(time, delta) {
         if (!this.localPlayer || !this.localPlayerSprite) return;
         
-        // delta is in milliseconds, convert to seconds
-        const dt = delta / 1000;
+        // Render client prediction
+        this.localPlayerSprite.x = this.clientState.x;
+        this.localPlayerSprite.y = this.clientState.y - this.clientState.z;
+        this.localPlayerSprite.setDepth(this.clientState.y);
+        this.localPlayerSprite.rotation = this.clientState.angle + Math.PI / 2;
         
-        // Read input
-        const moveX = (this.cursors.right.isDown || this.wasd.d.isDown ? 1 : 0) - 
-                      (this.cursors.left.isDown || this.wasd.a.isDown ? 1 : 0);
-        const moveY = (this.cursors.down.isDown || this.wasd.s.isDown ? 1 : 0) - 
-                      (this.cursors.up.isDown || this.wasd.w.isDown ? 1 : 0);
+        const stage = this.getEvolutionStage(this.localPlayer.level);
+        this.localPlayerSprite.setScale(stage.scale * 0.6);
         
-        // CLIENT CONTROLS MOVEMENT COMPLETELY
-        const stage = GameConfig.EVOLUTION_STAGES[Math.min(this.localPlayer.level - 1, GameConfig.EVOLUTION_STAGES.length - 1)];
-        let speed = stage.speed;
-        
-        // Apply class modifiers
-        if (this.localPlayer.class === "berserker") speed *= GameConfig.CLASSES.berserker.speedBonus;
-        else if (this.localPlayer.class === "paladin") speed *= GameConfig.CLASSES.paladin.speedPenalty;
-        else if (this.localPlayer.class === "assassin") speed *= GameConfig.CLASSES.assassin.speedBonus;
-        
-        // Calculate velocity
-        const inputMag = Math.sqrt(moveX ** 2 + moveY ** 2);
-        if (inputMag > 0) {
-            this.myPosition.vx = (moveX / inputMag) * speed;
-            this.myPosition.vy = (moveY / inputMag) * speed;
-        } else {
-            this.myPosition.vx *= GameConfig.FRICTION;
-            this.myPosition.vy *= GameConfig.FRICTION;
-        }
-        
-        // Update position INSTANTLY
-        this.myPosition.x += this.myPosition.vx * dt;
-        this.myPosition.y += this.myPosition.vy * dt;
-        
-        // Clamp to world bounds
-        this.myPosition.x = Math.max(30, Math.min(GameConfig.WORLD_WIDTH - 30, this.myPosition.x));
-        this.myPosition.y = Math.max(30, Math.min(GameConfig.WORLD_HEIGHT - 30, this.myPosition.y));
-        
-        // Update sprite position IMMEDIATELY
-        this.localPlayerSprite.x = this.myPosition.x;
-        this.localPlayerSprite.y = this.myPosition.y - (this.localPlayer.z || 0);
-        this.localPlayerSprite.setDepth(this.myPosition.y);
-        
-        // Update facing angle
-        const mouseWorldX = this.input.activePointer.worldX;
-        const mouseWorldY = this.input.activePointer.worldY;
-        this.myPosition.angle = Math.atan2(
-            mouseWorldY - this.myPosition.y,
-            mouseWorldX - this.myPosition.x
-        );
-        this.localPlayerSprite.rotation = this.myPosition.angle + Math.PI / 2;
-        
-        // Update animation
-        const isMoving = Math.abs(this.myPosition.vx) > 10 || Math.abs(this.myPosition.vy) > 10;
+        const isMoving = Math.abs(this.clientState.vx) > 10 || Math.abs(this.clientState.vy) > 10;
         if (this.localPlayer.isAttacking) {
             if (this.anims.exists(this.getAnimKey(this.localPlayer.level, 'attack'))) {
                 this.localPlayerSprite.play(this.getAnimKey(this.localPlayer.level, 'attack'), true);
@@ -651,7 +703,6 @@ class GameScene extends Phaser.Scene {
             this.localPlayerSprite.play(this.getAnimKey(this.localPlayer.level, 'idle'), true);
         }
         
-        // Update UI elements
         const nameText = this.nameTexts.get(this.mySessionId);
         const shadow = this.shadows.get(this.mySessionId);
         const healthBar = this.healthBars.get(this.mySessionId);
@@ -662,8 +713,11 @@ class GameScene extends Phaser.Scene {
         }
         
         if (shadow) {
-            shadow.x = this.myPosition.x;
-            shadow.y = this.myPosition.y;
+            shadow.x = this.clientState.x;
+            shadow.y = this.clientState.y;
+            const shadowScale = 1 - (this.clientState.z / 100) * 0.5;
+            shadow.setScale(shadowScale * stage.scale);
+            shadow.setAlpha(0.3 * shadowScale);
         }
         
         if (healthBar && this.localPlayer.hp < this.localPlayer.maxHp) {
@@ -683,19 +737,10 @@ class GameScene extends Phaser.Scene {
             healthBar.clear();
         }
         
-        // Handle attacks
         if (this.input.activePointer.isDown && this.localPlayer.attackCooldown <= 0) {
-            this.room.send("attack", { angle: this.myPosition.angle });
-            this.showSlashEffect(this.myPosition.x, this.myPosition.y, this.myPosition.angle);
+            this.showSlashEffect(this.clientState.x, this.clientState.y, this.clientState.angle);
         }
         
-        // Handle jump
-        if (this.spaceKey.isDown && !this.spaceWasDown) {
-            this.room.send("jump");
-        }
-        this.spaceWasDown = this.spaceKey.isDown;
-        
-        // Smooth camera zoom
         const targetZoom = Math.max(0.5, 0.8 - (this.localPlayer.level * 0.02));
         this.cameras.main.setZoom(Phaser.Math.Linear(this.cameras.main.zoom, targetZoom, 0.02));
     }
