@@ -21,7 +21,7 @@ class GameScene extends Phaser.Scene {
     }
     
     create() {
-        console.log('🎮 AGAR.IO PREDICTION + RECONCILIATION MODE');
+        console.log('ðŸŽ® AGAR.IO PREDICTION + RECONCILIATION MODE');
         
         this.WORLD_WIDTH = GameConfig.WORLD_WIDTH;
         this.WORLD_HEIGHT = GameConfig.WORLD_HEIGHT;
@@ -48,10 +48,15 @@ class GameScene extends Phaser.Scene {
             tree.setDepth(y);
         }
         
+        // Render terrain (will be updated when we receive server data)
+        this.terrainGraphics = this.add.graphics();
+        this.terrainGraphics.setDepth(-5);
+        
         this.createAnimations();
         
         this.playerSprites = new Map();
         this.npcSprites = new Map();
+        this.destructibleSprites = new Map();
         this.nameTexts = new Map();
         this.healthBars = new Map();
         this.shadows = new Map();
@@ -98,7 +103,7 @@ class GameScene extends Phaser.Scene {
     }
     
     async connectToServer() {
-        console.log('🔌 Connecting...');
+        console.log('ðŸ”Œ Connecting...');
         
         const SERVER_URL = window.location.hostname === 'localhost' 
             ? 'ws://localhost:2567'
@@ -108,10 +113,10 @@ class GameScene extends Phaser.Scene {
             this.client = new Colyseus.Client(SERVER_URL);
             this.room = await this.client.joinOrCreate("ffa", { username: username });
             this.mySessionId = this.room.sessionId;
-            console.log('✅ Connected:', this.mySessionId);
+            console.log('âœ… Connected:', this.mySessionId);
             
             this.room.onMessage("init", (message) => {
-                console.log('📨 Init received');
+                console.log('ðŸ“¨ Init received');
             });
             
             // SERVER STATE UPDATES (FOR RECONCILIATION)
@@ -120,29 +125,40 @@ class GameScene extends Phaser.Scene {
             });
             
             this.room.onStateChange.once((state) => {
-                console.log('📦 Initial state');
+                console.log('ðŸ“¦ Initial state');
                 
                 // Set up listeners AFTER state is ready
                 this.room.state.players.onAdd = (player, sessionId) => {
-                    console.log(`📡 Player added: ${sessionId}`);
+                    console.log(`ðŸ“¡ Player added: ${sessionId}`);
                     if (this.playerSprites.has(sessionId)) return;
                     this.addPlayer(sessionId, player);
                 };
                 
                 this.room.state.players.onRemove = (player, sessionId) => {
-                    console.log(`📡 Player removed: ${sessionId}`);
+                    console.log(`ðŸ“¡ Player removed: ${sessionId}`);
                     this.removePlayer(sessionId);
                 };
                 
                 this.room.state.npcs.onAdd = (npc, npcId) => {
-                    console.log(`📡 NPC added: ${npcId}`);
+                    console.log(`ðŸ“¡ NPC added: ${npcId}`);
                     if (this.npcSprites.has(npcId)) return;
                     this.addNPC(npcId, npc);
                 };
                 
                 this.room.state.npcs.onRemove = (npc, npcId) => {
-                    console.log(`📡 Server removed NPC: ${npcId}`);
+                    console.log(`ðŸ“¡ Server removed NPC: ${npcId}`);
                     this.removeNPC(npcId);
+                };
+                
+                this.room.state.destructibles.onAdd = (destructible, destructibleId) => {
+                    console.log(`📡 Destructible added: ${destructibleId}`);
+                    if (this.destructibleSprites.has(destructibleId)) return;
+                    this.addDestructible(destructibleId, destructible);
+                };
+                
+                this.room.state.destructibles.onRemove = (destructible, destructibleId) => {
+                    console.log(`📡 Server removed destructible: ${destructibleId}`);
+                    this.removeDestructible(destructibleId);
                 };
                 
                 state.players.forEach((player, sessionId) => {
@@ -153,7 +169,14 @@ class GameScene extends Phaser.Scene {
                     this.addNPC(npcId, npc);
                 });
                 
-                console.log('✅ CLIENT PREDICTION ACTIVE');
+                console.log('âœ… CLIENT PREDICTION ACTIVE');
+                
+                state.destructibles.forEach((destructible, destructibleId) => {
+                    this.addDestructible(destructibleId, destructible);
+                });
+                
+                // Request terrain data from server
+                this.requestTerrainData();
             });
             
             this.room.onMessage("player_hit", (data) => {
@@ -163,7 +186,7 @@ class GameScene extends Phaser.Scene {
             this.room.onMessage("npc_hit", (data) => {
                 const sprite = this.npcSprites.get(data.npcId);
                 if (sprite) {
-                    console.log(`💥 NPC hit flash: ${data.npcId}`);
+                    console.log(`ðŸ’¥ NPC hit flash: ${data.npcId}`);
                     this.flashSprite(sprite);
                 }
             });
@@ -176,18 +199,36 @@ class GameScene extends Phaser.Scene {
             });
             
             this.room.onMessage("npc_killed", (data) => {
-                console.log(`💀 npc_killed message: ${data.npcId}`);
+                console.log(`ðŸ’€ npc_killed message: ${data.npcId}`);
                 this.playDeathEffect(data.npcId, true);
                 // Remove the NPC immediately
                 this.removeNPC(data.npcId);
             });
             
+            
+            this.room.onMessage("terrain_data", (data) => {
+                console.log('🗺️ Received terrain data from server');
+                this.renderTerrain(data.terrainGrid);
+            });
             this.room.onMessage("midair_collision", (data) => {
                 this.showCollisionEffect(data.p1, data.p2);
             });
             
+            this.room.onMessage("destructible_hit", (data) => {
+                const sprite = this.destructibleSprites.get(data.destructibleId);
+                if (sprite) {
+                    this.flashSprite(sprite);
+                }
+            });
+            
+            this.room.onMessage("destructible_destroyed", (data) => {
+                console.log(`ðŸ'¥ Destructible destroyed: ${data.destructibleId}`);
+                this.playDestructionEffect(data.x, data.y, data.type);
+                this.removeDestructible(data.destructibleId);
+            });
+            
         } catch (e) {
-            console.error('❌ Connection failed:', e);
+            console.error('âŒ Connection failed:', e);
             alert('Failed to connect to server!');
         }
     }
@@ -269,7 +310,7 @@ class GameScene extends Phaser.Scene {
         };
         
         if (attack) {
-            console.log('🗡️ Sending attack to server');
+            console.log('ðŸ—¡ï¸ Sending attack to server');
         }
         
         // Send to server
@@ -381,7 +422,7 @@ class GameScene extends Phaser.Scene {
         this.healthBars.set(sessionId, healthBar);
         
         if (isLocal) {
-            console.log('👤 This is MY player!');
+            console.log('ðŸ‘¤ This is MY player!');
             this.localPlayer = player;
             this.localPlayerSprite = sprite;
             
@@ -439,7 +480,7 @@ class GameScene extends Phaser.Scene {
     }
     
     removeNPC(npcId) {
-        console.log(`🗑️ Removing NPC: ${npcId}`);
+        console.log(`ðŸ—‘ï¸ Removing NPC: ${npcId}`);
         const sprite = this.npcSprites.get(npcId);
         if (sprite) {
             console.log(`  Destroying sprite at (${sprite.x.toFixed(0)}, ${sprite.y.toFixed(0)})`);
@@ -628,7 +669,7 @@ class GameScene extends Phaser.Scene {
     }
     
     playDeathEffect(entityId, isNPC = false) {
-        console.log(`💥 Death effect for ${isNPC ? 'NPC' : 'player'}: ${entityId}`);
+        console.log(`ðŸ’¥ Death effect for ${isNPC ? 'NPC' : 'player'}: ${entityId}`);
         const sprite = isNPC ? this.npcSprites.get(entityId) : this.playerSprites.get(entityId);
         if (!sprite) {
             console.log(`  No sprite found!`);
@@ -814,5 +855,86 @@ class GameScene extends Phaser.Scene {
         
         const targetZoom = Math.max(0.5, 0.8 - (this.localPlayer.level * 0.02));
         this.cameras.main.setZoom(Phaser.Math.Linear(this.cameras.main.zoom, targetZoom, 0.02));
+    }
+    
+    addDestructible(destructibleId, destructible) {
+        // Create sprite based on type
+        const spriteKey = destructible.type === "barrel" ? 'barrel' : 'crate';
+        const sprite = this.add.rectangle(destructible.x, destructible.y, 40, 40, 
+            destructible.type === "barrel" ? 0x8B4513 : 0xA0522D);
+        sprite.setStrokeStyle(2, 0x000000);
+        sprite.setDepth(destructible.y - 1);
+        
+        this.destructibleSprites.set(destructibleId, sprite);
+        
+        // Listen for position changes (destructibles are static but just in case)
+        destructible.listen("x", (value) => { sprite.x = value; });
+        destructible.listen("y", (value) => { sprite.y = value; });
+    }
+    
+    removeDestructible(destructibleId) {
+        const sprite = this.destructibleSprites.get(destructibleId);
+        if (sprite) {
+            sprite.destroy();
+        }
+        this.destructibleSprites.delete(destructibleId);
+    }
+    
+    playDestructionEffect(x, y, type) {
+        // Create explosion effect
+        const explosion = this.add.sprite(x, y, 'explosion');
+        explosion.setScale(1.5);
+        explosion.play('explode');
+        explosion.once('animationcomplete', () => explosion.destroy());
+        
+        // Create debris particles
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i) / 8;
+            const speed = 100 + Math.random() * 50;
+            const debris = this.add.rectangle(x, y, 8, 8, 
+                type === "barrel" ? 0x8B4513 : 0xA0522D);
+            debris.setDepth(y);
+            
+            this.tweens.add({
+                targets: debris,
+                x: x + Math.cos(angle) * speed,
+                y: y + Math.sin(angle) * speed,
+                alpha: 0,
+                duration: 500 + Math.random() * 300,
+                onComplete: () => debris.destroy()
+            });
+        }
+        
+        this.cameras.main.shake(100, 0.003);
+    }
+    
+    requestTerrainData() {
+        // Request terrain grid from server
+        this.room.send("request_terrain");
+    }
+    
+    renderTerrain(terrainGrid) {
+        if (!terrainGrid) return;
+        
+        this.terrainGraphics.clear();
+        const gridSize = GameConfig.TERRAIN_GRID_SIZE;
+        
+        for (let x = 0; x < terrainGrid.length; x++) {
+            for (let y = 0; y < terrainGrid[x].length; y++) {
+                const terrainType = terrainGrid[x][y];
+                
+                if (terrainType === GameConfig.TERRAIN_TYPES.MUD) {
+                    // Brown mud patches
+                    this.terrainGraphics.fillStyle(0x8B4513, 0.4);
+                    this.terrainGraphics.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
+                } else if (terrainType === GameConfig.TERRAIN_TYPES.ICE) {
+                    // Light blue ice patches
+                    this.terrainGraphics.fillStyle(0xADD8E6, 0.5);
+                    this.terrainGraphics.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
+                }
+            }
+        }
+        
+        console.log('🗺️ Terrain rendered on client');
     }
 }

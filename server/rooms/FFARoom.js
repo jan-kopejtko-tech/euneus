@@ -74,28 +74,51 @@ type("number")(NPC.prototype, "maxHp");
 type("number")(NPC.prototype, "targetX");
 type("number")(NPC.prototype, "targetY");
 
+class Destructible extends Schema {
+  constructor(x, y, type) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.type = type; // "barrel" or "crate"
+    this.hp = type === "barrel" ? GameConfig.BARREL_HP : GameConfig.CRATE_HP;
+    this.maxHp = this.hp;
+  }
+}
+
+type("number")(Destructible.prototype, "x");
+type("number")(Destructible.prototype, "y");
+type("string")(Destructible.prototype, "type");
+type("number")(Destructible.prototype, "hp");
+type("number")(Destructible.prototype, "maxHp");
+
 class GameState extends Schema {
   constructor() {
     super();
     this.players = new MapSchema();
     this.npcs = new MapSchema();
+    this.destructibles = new MapSchema();
     this.tick = 0;
   }
 }
 
 type({ map: Player })(GameState.prototype, "players");
 type({ map: NPC })(GameState.prototype, "npcs");
+type({ map: Destructible })(GameState.prototype, "destructibles");
 type("number")(GameState.prototype, "tick");
 
 class FFARoom extends Room {
   
   onCreate(options) {
-    console.log("🎮 FFA Room Created! (SERVER AUTHORITATIVE)");
+    console.log("ðŸŽ® FFA Room Created! (SERVER AUTHORITATIVE)");
     
     this.setState(new GameState());
     this.maxClients = 200;
     
+    // Initialize terrain grid
+    this.initTerrainGrid();
+    
     this.spawnNPCs(GameConfig.NPC_COUNT);
+    this.spawnDestructibles(GameConfig.DESTRUCTIBLE_COUNT);
     
     // INPUT PROCESSING
     this.onMessage("input", (client, input) => {
@@ -103,7 +126,7 @@ class FFARoom extends Room {
       if (!player || player.hp <= 0) return;
       
       if (input.attack) {
-        console.log(`📥 Attack input received from ${player.username}`);
+        console.log(`ðŸ“¥ Attack input received from ${player.username}`);
       }
       
       this.processInput(player, input);
@@ -137,6 +160,11 @@ class FFARoom extends Room {
       }
     });
     
+    this.onMessage("request_terrain", (client) => {
+      // Send terrain grid to client
+      client.send("terrain_data", { terrainGrid: this.terrainGrid });
+    });
+    
     // Game loop - 20 ticks per second
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), 1000 / GameConfig.TICK_RATE);
     
@@ -147,6 +175,14 @@ class FFARoom extends Room {
         this.spawnNPCs(GameConfig.NPC_SPAWN_BATCH);
       }
     }, GameConfig.NPC_SPAWN_RATE);
+    
+    // Respawn destructibles periodically
+    this.destructibleRespawnTimer = this.clock.setInterval(() => {
+      const currentDestructibles = Array.from(this.state.destructibles.values()).length;
+      if (currentDestructibles < GameConfig.DESTRUCTIBLE_COUNT) {
+        this.spawnDestructibles(1);
+      }
+    }, GameConfig.DESTRUCTIBLE_RESPAWN_TIME);
   }
   
   processInput(player, input) {
@@ -159,13 +195,24 @@ class FFARoom extends Room {
     else if (player.class === "paladin") speed *= GameConfig.CLASSES.paladin.speedPenalty;
     else if (player.class === "assassin") speed *= GameConfig.CLASSES.assassin.speedBonus;
     
+    // Check terrain type at player position
+    const terrainType = this.getTerrainAt(player.x, player.y);
+    if (terrainType === GameConfig.TERRAIN_TYPES.MUD) {
+      speed *= GameConfig.MUD_SPEED_MULTIPLIER; // 50% speed on mud
+    }
+    
     const inputMag = Math.sqrt(input.moveX ** 2 + input.moveY ** 2);
     if (inputMag > 0) {
       player.vx = (input.moveX / inputMag) * speed;
       player.vy = (input.moveY / inputMag) * speed;
     } else {
-      player.vx *= GameConfig.FRICTION;
-      player.vy *= GameConfig.FRICTION;
+      // Apply terrain-specific friction
+      let friction = GameConfig.FRICTION;
+      if (terrainType === GameConfig.TERRAIN_TYPES.ICE) {
+        friction = GameConfig.ICE_FRICTION_MULTIPLIER; // Very low friction = sliding
+      }
+      player.vx *= friction;
+      player.vy *= friction;
     }
     
     player.x += player.vx * dt;
@@ -194,15 +241,15 @@ class FFARoom extends Room {
     }
     
     if (input.attack && player.attackCooldown <= 0 && !player.isAttacking) {
-      console.log(`🎯 Processing attack: cooldown=${player.attackCooldown}, isAttacking=${player.isAttacking}`);
+      console.log(`ðŸŽ¯ Processing attack: cooldown=${player.attackCooldown}, isAttacking=${player.isAttacking}`);
       this.performAttack(player, input.angle);
     } else if (input.attack) {
-      console.log(`❌ Attack blocked: cooldown=${player.attackCooldown}, isAttacking=${player.isAttacking}`);
+      console.log(`âŒ Attack blocked: cooldown=${player.attackCooldown}, isAttacking=${player.isAttacking}`);
     }
   }
   
   onJoin(client, options) {
-    console.log(`👋 ${options.username || "Player"} joined`);
+    console.log(`ðŸ‘‹ ${options.username || "Player"} joined`);
     
     const player = new Player(
       Math.random() * GameConfig.WORLD_WIDTH,
@@ -220,13 +267,14 @@ class FFARoom extends Room {
   }
   
   onLeave(client, consented) {
-    console.log(`❌ Player ${client.sessionId} left`);
+    console.log(`âŒ Player ${client.sessionId} left`);
     this.state.players.delete(client.sessionId);
   }
   
   onDispose() {
-    console.log("🗑️ FFA Room Disposed");
+    console.log("ðŸ—‘ï¸ FFA Room Disposed");
     this.npcSpawnTimer.clear();
+    this.destructibleRespawnTimer.clear();
   }
   
   update(deltaTime) {
@@ -359,7 +407,7 @@ class FFARoom extends Room {
     
     if (!attackerId) return;
     
-    console.log(`⚔️ Attack from ${attacker.username} at angle ${angle.toFixed(2)}`);
+    console.log(`âš”ï¸ Attack from ${attacker.username} at angle ${angle.toFixed(2)}`);
     
     attacker.isAttacking = true;
     attacker.attackCooldown = GameConfig.ATTACK_COOLDOWN;
@@ -436,7 +484,7 @@ class FFARoom extends Room {
         npcsHit++;
         const oldHp = npc.hp;
         npc.hp -= damage;
-        console.log(`  🎯 HIT NPC ${npcId}: HP ${oldHp} -> ${npc.hp} (damage: ${damage})`);
+        console.log(`  ðŸŽ¯ HIT NPC ${npcId}: HP ${oldHp} -> ${npc.hp} (damage: ${damage})`);
         
         npc.vx += Math.cos(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
         npc.vy += Math.sin(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
@@ -444,16 +492,52 @@ class FFARoom extends Room {
         this.broadcast("npc_hit", { npcId, damage });
         
         if (npc.hp <= 0) {
-          console.log(`  💀 NPC ${npcId} KILLED - deleting from state`);
+          console.log(`  ðŸ’€ NPC ${npcId} KILLED - deleting from state`);
           this.state.npcs.delete(npcId);
           this.giveXP(attacker, GameConfig.NPC_XP_REWARD);
           this.broadcast("npc_killed", { npcId, killerId: attackerId });
         } else {
-          console.log(`  ❤️ NPC ${npcId} survived with ${npc.hp} HP`);
+          console.log(`  â¤ï¸ NPC ${npcId} survived with ${npc.hp} HP`);
         }
       }
     }
     console.log(`  NPCs in range: ${npcsInRange}, NPCs hit: ${npcsHit}, Total NPCs: ${this.state.npcs.size}`);
+    
+    // Check Destructibles
+    for (let [destructibleId, destructible] of this.state.destructibles) {
+      const dx = destructible.x - attacker.x;
+      const dy = destructible.y - attacker.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist > range) continue;
+      
+      const angleToTarget = Math.atan2(dy, dx);
+      let angleDiff = Math.abs(angleToTarget - angle);
+      if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+      
+      if (angleDiff <= arc / 2) {
+        destructible.hp -= damage;
+        console.log(`  ðŸ"¦ HIT ${destructible.type.toUpperCase()} ${destructibleId}: HP ${destructible.hp}/${destructible.maxHp}`);
+        
+        this.broadcast("destructible_hit", { destructibleId, damage });
+        
+        if (destructible.hp <= 0) {
+          console.log(`  ðŸ'¥ ${destructible.type.toUpperCase()} DESTROYED`);
+          const xpReward = Math.floor(
+            Math.random() * (GameConfig.DESTRUCTIBLE_XP_MAX - GameConfig.DESTRUCTIBLE_XP_MIN + 1) + 
+            GameConfig.DESTRUCTIBLE_XP_MIN
+          );
+          this.giveXP(attacker, xpReward);
+          this.state.destructibles.delete(destructibleId);
+          this.broadcast("destructible_destroyed", { 
+            destructibleId, 
+            x: destructible.x, 
+            y: destructible.y, 
+            type: destructible.type 
+          });
+        }
+      }
+    }
   }
   
   checkDeath(victimId, victim, killerId) {
@@ -549,6 +633,82 @@ class FFARoom extends Room {
   getEvolutionStage(level) {
     const clampedLevel = Math.max(1, Math.min(level, GameConfig.EVOLUTION_STAGES.length));
     return GameConfig.EVOLUTION_STAGES[clampedLevel - 1];
+  }
+  
+  initTerrainGrid() {
+    // Create terrain grid
+    const gridWidth = Math.ceil(GameConfig.WORLD_WIDTH / GameConfig.TERRAIN_GRID_SIZE);
+    const gridHeight = Math.ceil(GameConfig.WORLD_HEIGHT / GameConfig.TERRAIN_GRID_SIZE);
+    
+    this.terrainGrid = [];
+    for (let x = 0; x < gridWidth; x++) {
+      this.terrainGrid[x] = [];
+      for (let y = 0; y < gridHeight; y++) {
+        this.terrainGrid[x][y] = GameConfig.TERRAIN_TYPES.NORMAL;
+      }
+    }
+    
+    // Generate mud patches
+    for (let i = 0; i < GameConfig.MUD_PATCH_COUNT; i++) {
+      const centerX = Math.random() * GameConfig.WORLD_WIDTH;
+      const centerY = Math.random() * GameConfig.WORLD_HEIGHT;
+      this.createTerrainPatch(centerX, centerY, GameConfig.TERRAIN_PATCH_RADIUS, GameConfig.TERRAIN_TYPES.MUD);
+    }
+    
+    // Generate ice patches
+    for (let i = 0; i < GameConfig.ICE_PATCH_COUNT; i++) {
+      const centerX = Math.random() * GameConfig.WORLD_WIDTH;
+      const centerY = Math.random() * GameConfig.WORLD_HEIGHT;
+      this.createTerrainPatch(centerX, centerY, GameConfig.TERRAIN_PATCH_RADIUS, GameConfig.TERRAIN_TYPES.ICE);
+    }
+    
+    console.log(`🗺️ Terrain grid initialized: ${gridWidth}x${gridHeight}`);
+  }
+  
+  createTerrainPatch(centerX, centerY, radius, terrainType) {
+    const gridSize = GameConfig.TERRAIN_GRID_SIZE;
+    const minGridX = Math.max(0, Math.floor((centerX - radius) / gridSize));
+    const maxGridX = Math.min(this.terrainGrid.length - 1, Math.floor((centerX + radius) / gridSize));
+    const minGridY = Math.max(0, Math.floor((centerY - radius) / gridSize));
+    const maxGridY = Math.min(this.terrainGrid[0].length - 1, Math.floor((centerY + radius) / gridSize));
+    
+    for (let gx = minGridX; gx <= maxGridX; gx++) {
+      for (let gy = minGridY; gy <= maxGridY; gy++) {
+        const cellCenterX = gx * gridSize + gridSize / 2;
+        const cellCenterY = gy * gridSize + gridSize / 2;
+        const dist = Math.sqrt((cellCenterX - centerX) ** 2 + (cellCenterY - centerY) ** 2);
+        
+        if (dist <= radius) {
+          this.terrainGrid[gx][gy] = terrainType;
+        }
+      }
+    }
+  }
+  
+  getTerrainAt(x, y) {
+    const gridX = Math.floor(x / GameConfig.TERRAIN_GRID_SIZE);
+    const gridY = Math.floor(y / GameConfig.TERRAIN_GRID_SIZE);
+    
+    if (gridX >= 0 && gridX < this.terrainGrid.length && 
+        gridY >= 0 && gridY < this.terrainGrid[0].length) {
+      return this.terrainGrid[gridX][gridY];
+    }
+    
+    return GameConfig.TERRAIN_TYPES.NORMAL;
+  }
+  
+  spawnDestructibles(count) {
+    for (let i = 0; i < count; i++) {
+      const destructibleId = `dest_${Date.now()}_${Math.random()}`;
+      const type = Math.random() < 0.5 ? "barrel" : "crate";
+      const destructible = new Destructible(
+        Math.random() * GameConfig.WORLD_WIDTH,
+        Math.random() * GameConfig.WORLD_HEIGHT,
+        type
+      );
+      this.state.destructibles.set(destructibleId, destructible);
+    }
+    console.log(`📦 Spawned ${count} destructibles`);
   }
 }
 

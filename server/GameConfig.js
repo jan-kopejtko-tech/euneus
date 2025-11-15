@@ -38,6 +38,28 @@ const GameConfig = {
     NPC_HP: 30,
     NPC_SPEED: 80,
     NPC_DAMAGE: 5,
+    
+    // DESTRUCTIBLES
+    DESTRUCTIBLE_COUNT: 50,
+    DESTRUCTIBLE_RESPAWN_TIME: 15000, // 15 seconds
+    BARREL_HP: 30,
+    CRATE_HP: 40,
+    DESTRUCTIBLE_XP_MIN: 15,
+    DESTRUCTIBLE_XP_MAX: 25,
+    
+    // TERRAIN
+    TERRAIN_GRID_SIZE: 200, // Grid cell size in pixels
+    TERRAIN_TYPES: {
+        NORMAL: 0,
+        MUD: 1,
+        ICE: 2
+    },
+    MUD_SPEED_MULTIPLIER: 0.5, // 50% speed reduction
+    ICE_FRICTION_MULTIPLIER: 0.95, // Very low friction = sliding
+    MUD_PATCH_COUNT: 15,
+    ICE_PATCH_COUNT: 10,
+    TERRAIN_PATCH_RADIUS: 150,
+    
     CLASSES: {
         berserker: {
             name: "Berserker",
