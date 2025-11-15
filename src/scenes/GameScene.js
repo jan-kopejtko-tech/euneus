@@ -162,7 +162,10 @@ class GameScene extends Phaser.Scene {
             
             this.room.onMessage("npc_hit", (data) => {
                 const sprite = this.npcSprites.get(data.npcId);
-                if (sprite) this.flashSprite(sprite);
+                if (sprite) {
+                    console.log(`💥 NPC hit flash: ${data.npcId}`);
+                    this.flashSprite(sprite);
+                }
             });
             
             this.room.onMessage("player_killed", (data) => {
