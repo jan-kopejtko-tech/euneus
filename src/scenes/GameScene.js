@@ -173,7 +173,10 @@ class GameScene extends Phaser.Scene {
             });
             
             this.room.onMessage("npc_killed", (data) => {
+                console.log(`💀 npc_killed message: ${data.npcId}`);
                 this.playDeathEffect(data.npcId, true);
+                // Remove the NPC immediately
+                this.removeNPC(data.npcId);
             });
             
             this.room.onMessage("midair_collision", (data) => {
