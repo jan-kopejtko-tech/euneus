@@ -352,6 +352,8 @@ class FFARoom extends Room {
     
     if (!attackerId) return;
     
+    console.log(`⚔️ Attack from ${attacker.username} at angle ${angle.toFixed(2)}`);
+    
     attacker.isAttacking = true;
     attacker.attackCooldown = GameConfig.ATTACK_COOLDOWN;
     
@@ -359,6 +361,8 @@ class FFARoom extends Room {
     const range = GameConfig.ATTACK_RANGE * stage.scale;
     const arc = GameConfig.ATTACK_ARC;
     let damage = stage.damage;
+    
+    console.log(`  Range: ${range.toFixed(0)}, Damage: ${damage}`);
     
     if (attacker.class === "berserker") {
       damage *= GameConfig.CLASSES.berserker.damageBonus;
@@ -407,11 +411,14 @@ class FFARoom extends Room {
     }
     
     // Check NPCs
+    let npcsInRange = 0;
+    let npcsHit = 0;
     for (let [npcId, npc] of this.state.npcs) {
       const dx = npc.x - attacker.x;
       const dy = npc.y - attacker.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       
+      if (dist <= range) npcsInRange++;
       if (dist > range) continue;
       
       const angleToTarget = Math.atan2(dy, dx);
@@ -419,6 +426,7 @@ class FFARoom extends Room {
       if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
       
       if (angleDiff <= arc / 2) {
+        npcsHit++;
         npc.hp -= damage;
         
         npc.vx += Math.cos(angle) * GameConfig.KNOCKBACK_FORCE * 0.5;
@@ -427,12 +435,14 @@ class FFARoom extends Room {
         this.broadcast("npc_hit", { npcId, damage });
         
         if (npc.hp <= 0) {
+          console.log(`  💀 NPC killed`);
           this.state.npcs.delete(npcId);
           this.giveXP(attacker, GameConfig.NPC_XP_REWARD);
           this.broadcast("npc_killed", { npcId, killerId: attackerId });
         }
       }
     }
+    console.log(`  NPCs in range: ${npcsInRange}, NPCs hit: ${npcsHit}, Total NPCs: ${this.state.npcs.size}`);
   }
   
   checkDeath(victimId, victim, killerId) {
